@@ -1,0 +1,119 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #111111;
+  --muted: #8b8b8b;
+  --line: #ebebeb;
+  --pill: #f4f4f4;
+  --pill-active: #111111;
+  --panel: #ffffff;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  overflow-y: scroll;
+}
+
+body {
+  margin: 0;
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-sans), sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Site nav: global `a` removes underlines; restore for active route */
+nav[aria-label="Site"] a.site-nav-link--active {
+  color: #111;
+  text-decoration: underline;
+  text-decoration-color: #111;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 6px;
+}
+
+nav[aria-label="Site"] a.site-nav-link:not(.site-nav-link--active) {
+  color: #555;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.glass-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+.display-face {
+  font-family: var(--font-sans), sans-serif;
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+.hide-scrollbar {
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.filter-controls {
+  overflow-anchor: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fade-in {
+    animation: fade-in 420ms ease both;
+  }
+
+  .slide-up {
+    animation: slide-up 500ms ease both;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes loading-bar {
+  0% {
+    transform: translateX(-110%);
+  }
+
+  100% {
+    transform: translateX(230%);
+  }
+}

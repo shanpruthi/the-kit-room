@@ -1,0 +1,62 @@
+import { unstable_cache } from "next/cache"
+import {
+  getCatalogSummary,
+  getExploreKitCatalog,
+  getInitialFindCatalogPage,
+} from "@/lib/kits"
+import type { CatalogPage, CatalogSummary } from "@/lib/types"
+
+function buildFallbackSummary(initialFindPage: CatalogPage): CatalogSummary {
+  return {
+    kitsCount: initialFindPage.totalCount,
+    teamsCount: new Set(initialFindPage.kits.map((kit) => kit.teamName)).size,
+    decades: Array.from(
+      new Set(
+        initialFindPage.kits
+          .filter((kit) => kit.seasonStartYear !== null)
+          .map((kit) => {
+            const decadeStart = Math.floor((kit.seasonStartYear ?? 0) / 10) * 10
+            return `${decadeStart}-${decadeStart + 9}`
+          }),
+      ),
+    ).sort(),
+    brands: Array.from(new Set(initialFindPage.kits.map((kit) => kit.brandName))).sort(),
+    kitTypes: Array.from(
+      new Set(
+        initialFindPage.kits.map((kit) =>
+          kit.kitType.charAt(0).toUpperCase() + kit.kitType.slice(1),
+        ),
+      ),
+    ).sort(),
+  }
+}
+
+async function fetchKitRoomShellData() {
+  const initialFindPage = await getInitialFindCatalogPage()
+  const [summaryResult, exploreResult] = await Promise.allSettled([
+    getCatalogSummary(),
+    getExploreKitCatalog(),
+  ])
+
+  const summary =
+    summaryResult.status === "fulfilled"
+      ? summaryResult.value
+      : buildFallbackSummary(initialFindPage)
+
+  const exploreKits =
+    exploreResult.status === "fulfilled" ? exploreResult.value : initialFindPage.kits
+
+  const summaryNeedsRefresh = summaryResult.status !== "fulfilled"
+
+  return {
+    initialFindPage,
+    summary,
+    exploreKits,
+    summaryNeedsRefresh,
+  }
+}
+
+/** Cached catalog payload so revisiting `/` does not re-hit Supabase on every navigation. */
+export const getKitRoomShellData = unstable_cache(fetchKitRoomShellData, ["kit-room-shell"], {
+  revalidate: 300,
+})
