@@ -26,7 +26,8 @@ type KitRoomShellProps = {
   profileUserId?: string
 }
 
-const FIND_PAGE_SIZE = 150
+const FIND_PAGE_SIZE_DESKTOP = 150
+const FIND_PAGE_SIZE_MOBILE = 20
 
 const colorOptions = [
   { name: "Red", hex: "#c53b32" },
@@ -1004,6 +1005,9 @@ export function KitRoomShell({
   const [showProfile] = useState(initialRoute === "profile")
   const [profileTab, setProfileTab] = useState<ProfileTab>("rated")
   const [viewMode, setViewMode] = useState<"find" | "explore">("find")
+  const [findPageSize, setFindPageSize] = useState(FIND_PAGE_SIZE_MOBILE)
+  const findPageSizeRef = useRef(FIND_PAGE_SIZE_MOBILE)
+  findPageSizeRef.current = findPageSize
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [authResolved, setAuthResolved] = useState(false)
   const [brokenImageIds, setBrokenImageIds] = useState<number[]>([])
@@ -1033,6 +1037,22 @@ export function KitRoomShell({
   )
 
   const { setLeft } = useHeaderSlot()
+
+  useLayoutEffect(() => {
+    const media = window.matchMedia("(min-width: 768px)")
+
+    function syncViewport() {
+      const wide = media.matches
+      if (!wide) {
+        setViewMode("find")
+      }
+      setFindPageSize(wide ? FIND_PAGE_SIZE_DESKTOP : FIND_PAGE_SIZE_MOBILE)
+    }
+
+    syncViewport()
+    media.addEventListener("change", syncViewport)
+    return () => media.removeEventListener("change", syncViewport)
+  }, [])
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -1407,7 +1427,7 @@ export function KitRoomShell({
       params.set("q", debouncedSearch)
     }
 
-    params.set("limit", String(FIND_PAGE_SIZE))
+    params.set("limit", String(findPageSizeRef.current))
     params.set("offset", String(offset))
 
     activeDecades.forEach((decade) => params.append("decade", decade))
@@ -1498,6 +1518,18 @@ export function KitRoomShell({
     void loadFindPage({ offset: 0, append: false })
   }, [currentFindQueryKey])
 
+  const skipInitialMobileCatalogRef = useRef(false)
+  useEffect(() => {
+    if (!skipInitialMobileCatalogRef.current) {
+      skipInitialMobileCatalogRef.current = true
+      if (findPageSize === FIND_PAGE_SIZE_MOBILE) {
+        return
+      }
+    }
+
+    void loadFindPage({ offset: 0, append: false })
+  }, [findPageSize])
+
   useEffect(() => {
     if (!findAnimatedRange) {
       return
@@ -1534,7 +1566,14 @@ export function KitRoomShell({
     observer.observe(node)
 
     return () => observer.disconnect()
-  }, [findHasMore, findKits.length, findLoading, findLoadingMore, viewMode])
+  }, [
+    findHasMore,
+    findKits.length,
+    findLoading,
+    findLoadingMore,
+    findPageSize,
+    viewMode,
+  ])
 
   const kitsById = useMemo(() => {
     const merged = new Map<number, CatalogKit>()
@@ -1759,7 +1798,7 @@ export function KitRoomShell({
     }
 
     setLeft(
-      <div className="inline-flex items-center rounded-full border border-[var(--line)] bg-[#fafafa] p-1 text-[13px]">
+      <div className="hidden items-center rounded-full border border-[var(--line)] bg-[#fafafa] p-1 text-[13px] md:inline-flex">
         <button
           type="button"
           onClick={() => setViewMode("find")}

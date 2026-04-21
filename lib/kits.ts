@@ -350,7 +350,7 @@ export async function getInitialFindCatalogPage(): Promise<CatalogPage> {
     brands: [],
     kitTypes: [],
     colors: [],
-    limit: 150,
+    limit: 20,
     offset: 0,
     sortByMemberRating: true,
   })

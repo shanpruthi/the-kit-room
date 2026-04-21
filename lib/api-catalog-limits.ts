@@ -1,6 +1,6 @@
 /**
  * Bounds for unauthenticated `/api/kits` usage (abuse / accidental huge queries).
- * Aligned with app usage: Find uses 150 per page (`FIND_PAGE_SIZE`).
+ * Aligned with app usage: Find uses up to 150 per page on desktop, 20 on narrow viewports.
  */
 export const MAX_CATALOG_PAGE_LIMIT = 150
 export const MAX_CATALOG_OFFSET = 500_000
