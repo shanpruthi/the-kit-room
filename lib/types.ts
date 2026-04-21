@@ -46,6 +46,12 @@ export interface CatalogSearchParams {
   colors: string[]
   limit: number
   offset: number
+  /**
+   * When true with no query/facets, uses member ratings (avg of `user_kit_states.rating` per kit):
+   * rated kits first, highest average first; unrated kits after. Requires DB RPC
+   * `search_kits_catalog_by_member_rating`.
+   */
+  sortByMemberRating?: boolean
 }
 
 export interface CatalogPage {

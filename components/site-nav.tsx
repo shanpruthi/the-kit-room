@@ -72,8 +72,10 @@ function NavLink({
       href={href}
       scroll={true}
       prefetch={true}
-      className={`site-nav-link inline-flex items-center transition hover:text-[#111] ${navTextClass} ${
-        active ? "site-nav-link--active" : ""
+      className={`inline-flex items-center border-b-2 pb-0.5 transition ${navTextClass} ${
+        active
+          ? "border-[#111] text-[#111]"
+          : "border-transparent text-[#555] hover:text-[#111]"
       }`}
       aria-current={active ? "page" : undefined}
     >
@@ -174,7 +176,7 @@ export function SiteNav() {
         aria-label="Site"
       >
         <NavLink href="/" active={isHome}>
-          Kit Room
+          The Kit Room
         </NavLink>
         <NavLink href="/trends" active={isTrends}>
           Trends
@@ -215,10 +217,8 @@ export function SiteNav() {
             <button
               type="button"
               onClick={openLogin}
-              className={`inline-flex cursor-pointer items-center border-0 bg-transparent p-0 ${navTextClass} text-[#555] antialiased transition hover:text-[#111]`}
+              className={`m-0 inline-flex cursor-pointer items-center border-0 border-b-2 border-transparent bg-transparent p-0 pb-0.5 ${navTextClass} text-[#555] transition hover:text-[#111]`}
               style={{
-                fontSize: "12px",
-                lineHeight: 1.2,
                 WebkitAppearance: "none",
                 appearance: "none",
               }}

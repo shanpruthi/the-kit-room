@@ -32,19 +32,6 @@ a {
   text-decoration: none;
 }
 
-/* Site nav: global `a` removes underlines; restore for active route */
-nav[aria-label="Site"] a.site-nav-link--active {
-  color: #111;
-  text-decoration: underline;
-  text-decoration-color: #111;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 6px;
-}
-
-nav[aria-label="Site"] a.site-nav-link:not(.site-nav-link--active) {
-  color: #555;
-}
-
 button,
 input {
   font: inherit;

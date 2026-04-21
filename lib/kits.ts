@@ -250,9 +250,49 @@ export async function getKitsByIds(ids: number[]): Promise<CatalogKit[]> {
   })
 }
 
+function isDefaultUnfilteredCatalogQuery(params: CatalogSearchParams) {
+  return (
+    !params.query?.trim() &&
+    params.decades.length === 0 &&
+    params.brands.length === 0 &&
+    params.kitTypes.length === 0 &&
+    params.colors.length === 0
+  )
+}
+
 export async function searchKitCatalog(
   params: CatalogSearchParams,
 ): Promise<CatalogPage> {
+  const useMemberRatingSort =
+    Boolean(params.sortByMemberRating) && isDefaultUnfilteredCatalogQuery(params)
+
+  if (useMemberRatingSort) {
+    const { data, error } = await supabase.rpc("search_kits_catalog_by_member_rating", {
+      page_limit: params.limit,
+      page_offset: params.offset,
+    })
+
+    if (error) {
+      return searchKitCatalog({
+        ...params,
+        sortByMemberRating: false,
+      })
+    }
+
+    const rows = (data ?? []) as SearchKitRow[]
+    const ids = rows.map((row) => row.kit_id)
+    const kits = await getKitsByIds(ids)
+    const totalCount = Number(rows[0]?.total_count ?? 0)
+
+    return {
+      kits,
+      totalCount,
+      limit: params.limit,
+      offset: params.offset,
+      hasMore: params.offset + kits.length < totalCount,
+    }
+  }
+
   const { data, error } = await supabase.rpc("search_kits_catalog", {
     search_query: params.query || null,
     decades: params.decades.length ? params.decades : null,
@@ -312,6 +352,7 @@ export async function getInitialFindCatalogPage(): Promise<CatalogPage> {
     colors: [],
     limit: 150,
     offset: 0,
+    sortByMemberRating: true,
   })
 }
 

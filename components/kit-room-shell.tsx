@@ -155,6 +155,22 @@ function buildFindQueryKey({
   })
 }
 
+function isUnfilteredFindQuery(
+  search: string,
+  decades: string[],
+  brands: string[],
+  kitTypes: string[],
+  colors: string[],
+) {
+  return (
+    search.trim() === "" &&
+    decades.length === 0 &&
+    brands.length === 0 &&
+    kitTypes.length === 0 &&
+    colors.length === 0
+  )
+}
+
 function getDecade(year: number | null) {
   if (!year) {
     return "Unknown"
@@ -1399,6 +1415,18 @@ export function KitRoomShell({
     activeKitTypes.forEach((kitType) => params.append("kitType", kitType))
     activeColors.forEach((color) => params.append("color", color))
 
+    if (
+      isUnfilteredFindQuery(
+        debouncedSearch,
+        activeDecades,
+        activeBrands,
+        activeKitTypes,
+        activeColors,
+      )
+    ) {
+      params.set("sort", "member_rating")
+    }
+
     try {
       const response = await fetch(`/api/kits?${params.toString()}`, {
         cache: "no-store",
@@ -1994,9 +2022,12 @@ export function KitRoomShell({
           </div>
 
           <div className="slide-up mx-auto mt-8 flex justify-center">
-            <div className="relative w-full max-w-[34rem]">
-              <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[26px] text-[#888]">
-                ⌕
+            <div className="relative isolate w-full max-w-[34rem]">
+              <span
+                className="pointer-events-none absolute bottom-0 left-0 top-0 z-10 flex w-12 items-center justify-center text-[#888]"
+                aria-hidden
+              >
+                <span className="text-[24px] leading-none">⌕</span>
               </span>
               <input
                 ref={searchInputRef}
@@ -2005,22 +2036,24 @@ export function KitRoomShell({
                   setSearch(event.target.value)
                 }}
                 placeholder="Search clubs, years, brands..."
-                className="w-full rounded-[8px] border border-[var(--line)] bg-white px-11 py-[0.625rem] text-[14px] text-[#555] outline-none transition placeholder:text-[14px] focus:border-[#d3d3d3]"
+                className="relative z-0 w-full rounded-[8px] border border-[var(--line)] bg-white py-[0.625rem] pl-12 pr-[3.25rem] text-[14px] text-[#555] outline-none transition placeholder:text-[14px] focus:border-[#d3d3d3]"
               />
-              {search ? (
-                <button
-                  type="button"
-                  onClick={() => setSearch("")}
-                  className="absolute right-4 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-[18px] leading-none text-[#9a9a9a] transition hover:bg-[#f5f5f5] hover:text-[#666]"
-                  aria-label="Clear search"
-                >
-                  ×
-                </button>
-              ) : (
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 rounded-[4px] bg-[#f5f5f5] px-2 py-0.5 text-[10px] text-[#9a9a9a]">
-                  /
-                </span>
-              )}
+              <div className="absolute bottom-0 right-0 top-0 z-10 flex items-center pr-2">
+                {search ? (
+                  <button
+                    type="button"
+                    onClick={() => setSearch("")}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[17px] leading-none text-[#9a9a9a] transition hover:bg-[#f0f0f0] hover:text-[#555]"
+                    aria-label="Clear search"
+                  >
+                    ×
+                  </button>
+                ) : (
+                  <span className="inline-flex h-7 min-w-[1.75rem] items-center justify-center rounded border border-[#ebebeb] bg-[#f5f5f5] px-1.5 text-[11px] font-medium leading-none text-[#9a9a9a]">
+                    /
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 

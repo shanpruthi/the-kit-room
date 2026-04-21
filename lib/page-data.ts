@@ -57,6 +57,18 @@ async function fetchKitRoomShellData() {
 }
 
 /** Cached catalog payload so revisiting `/` does not re-hit Supabase on every navigation. */
-export const getKitRoomShellData = unstable_cache(fetchKitRoomShellData, ["kit-room-shell"], {
+const getCachedKitRoomShellData = unstable_cache(fetchKitRoomShellData, ["kit-room-shell"], {
   revalidate: 300,
 })
+
+/**
+ * In development (`next dev`, e.g. localhost:3000), skip the data cache so the Find grid
+ * matches live RPC results and API responses. Production keeps the cached payload.
+ */
+export async function getKitRoomShellData() {
+  if (process.env.NODE_ENV === "development") {
+    return fetchKitRoomShellData()
+  }
+
+  return getCachedKitRoomShellData()
+}

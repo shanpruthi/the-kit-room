@@ -1,0 +1,7 @@
+-- Merged into: fix-kit-season-years-plus-100.sql
+--
+-- That file fixes both:
+--   • season_start_year / season_end_year (numeric)
+--   • season_label (text)
+--
+-- Open and run `fix-kit-season-years-plus-100.sql` in Supabase SQL Editor.

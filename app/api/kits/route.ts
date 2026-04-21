@@ -30,6 +30,7 @@ export async function GET(request: Request) {
   const offset = clampInt(offsetValue, 0, MAX_CATALOG_OFFSET, 0)
 
   try {
+    const sort = searchParams.get("sort")?.trim().toLowerCase()
     const page = await searchKitCatalog({
       query: searchParams.get("q")?.trim() ?? "",
       decades: takeFacets(searchParams.getAll("decade")),
@@ -38,6 +39,7 @@ export async function GET(request: Request) {
       colors: takeFacets(searchParams.getAll("color")),
       limit,
       offset,
+      sortByMemberRating: sort === "member_rating",
     })
 
     return NextResponse.json(page)
