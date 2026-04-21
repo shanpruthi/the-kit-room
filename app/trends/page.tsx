@@ -1,7 +1,8 @@
 import { TrendsHeaderLeft } from "@/app/trends/trends-header-left"
 import { getTrendsPageData } from "@/lib/trends"
 
-export const revalidate = 3600
+/** Fresh member-rating aggregates on every visit (no static/ISR cache). */
+export const dynamic = "force-dynamic"
 
 function formatCount(value: number) {
   return new Intl.NumberFormat("en-US").format(value)
