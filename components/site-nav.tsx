@@ -217,13 +217,14 @@ export function SiteNav() {
             <button
               type="button"
               onClick={openLogin}
-              className={`m-0 inline-flex cursor-pointer items-center border-0 border-b-2 border-transparent bg-transparent p-0 pb-0.5 ${navTextClass} text-[#555] transition hover:text-[#111]`}
+              className="m-0 inline-flex min-h-0 cursor-pointer items-center border-0 border-b-2 border-transparent bg-transparent p-0 pb-0.5 text-[#555] transition hover:text-[#111]"
               style={{
                 WebkitAppearance: "none",
                 appearance: "none",
+                font: "unset",
               }}
             >
-              Login / Sign up
+              <span className={navTextClass}>Login / Sign up</span>
             </button>
           )
         ) : (
