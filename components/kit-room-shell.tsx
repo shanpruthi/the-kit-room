@@ -551,6 +551,7 @@ function KitModal({
   onToggleWanted,
   onRatingChange,
   onClose,
+  readOnly = false,
 }: {
   kit: CatalogKit | null
   currentUser: User | null
@@ -563,6 +564,8 @@ function KitModal({
   onToggleWanted: () => void
   onRatingChange: (rating: number) => void
   onClose: () => void
+  /** Someone else's profile / collection — show their saved state without editing. */
+  readOnly?: boolean
 }) {
   useEffect(() => {
     if (!kit) {
@@ -640,10 +643,56 @@ function KitModal({
 
               <div className="space-y-3">
                 <p className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">
-                  Your kit log
+                  {readOnly ? "Kit log" : "Your kit log"}
                 </p>
 
-                {currentUser ? (
+                {readOnly ? (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-2">
+                      <span
+                        className={`rounded-full border px-3.5 py-1.5 text-[12px] ${
+                          userKitState.owned
+                            ? "border-[#111] bg-[#111] text-white"
+                            : "border-[var(--line)] bg-white text-[#555]"
+                        }`}
+                      >
+                        Own
+                      </span>
+                      <span
+                        className={`rounded-full border px-3.5 py-1.5 text-[12px] ${
+                          userKitState.wanted
+                            ? "border-[#111] bg-[#111] text-white"
+                            : "border-[var(--line)] bg-white text-[#555]"
+                        }`}
+                      >
+                        Want
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      {[1, 2, 3, 4, 5].map((value) => {
+                        const isActive = (userKitState.rating ?? 0) >= value
+
+                        return (
+                          <span
+                            key={value}
+                            className={`text-[20px] leading-none ${
+                              isActive ? "text-[#111]" : "text-[#d0d0d0]"
+                            }`}
+                            aria-hidden
+                          >
+                            ★
+                          </span>
+                        )
+                      })}
+                      <span className="ml-2 text-[12px] text-[#777]">
+                        {userKitState.rating
+                          ? `${userKitState.rating}/5`
+                          : "No rating yet"}
+                      </span>
+                    </div>
+                  </div>
+                ) : currentUser ? (
                   <div className="space-y-3">
                     <div className="flex flex-wrap gap-2">
                       <button
@@ -1014,6 +1063,13 @@ export function KitRoomShell({
   const [savedKitEntriesLoading, setSavedKitEntriesLoading] = useState(false)
   const [profileKits, setProfileKits] = useState<CatalogKit[]>([])
   const [profileKitsLoading, setProfileKitsLoading] = useState(false)
+  const [publicProfileEntries, setPublicProfileEntries] = useState<SavedKitEntry[]>([])
+  const [publicProfileMeta, setPublicProfileMeta] = useState<{
+    displayName: string
+    avatarUrl: string | null
+  }>({ displayName: "Member", avatarUrl: null })
+  const [publicProfileLoading, setPublicProfileLoading] = useState(false)
+  const [publicProfileError, setPublicProfileError] = useState<string | null>(null)
   const [userKitState, setUserKitState] = useState<UserKitState>(emptyUserKitState)
   const [userKitStateLoading, setUserKitStateLoading] = useState(false)
   const [userKitStateSaving, setUserKitStateSaving] = useState(false)
@@ -1213,7 +1269,119 @@ export function KitRoomShell({
   }, [browserSupabase, currentUser])
 
   useEffect(() => {
-    const ids = savedKitEntries.map((entry) => entry.kitId)
+    if (!showProfile || !profileUserId) {
+      return
+    }
+
+    const routeProfileId = profileUserId
+
+    if (currentUser && routeProfileId === currentUser.id) {
+      return
+    }
+
+    let cancelled = false
+
+    async function loadPublicProfile() {
+      setPublicProfileLoading(true)
+      setPublicProfileError(null)
+
+      try {
+        const response = await fetch(
+          `/api/profile/${encodeURIComponent(routeProfileId)}`,
+          { cache: "no-store" },
+        )
+
+        if (cancelled) {
+          return
+        }
+
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => ({}))) as {
+            error?: string
+          }
+          setPublicProfileEntries([])
+          setPublicProfileError(
+            response.status === 404
+              ? "We could not find that profile."
+              : (payload.error ?? "Could not load this profile."),
+          )
+          setPublicProfileLoading(false)
+          return
+        }
+
+        const payload = (await response.json()) as {
+          entries: {
+            kitId: number
+            owned: boolean
+            wanted: boolean
+            rating: number | null
+          }[]
+          displayName: string
+          avatarUrl: string | null
+        }
+
+        if (cancelled) {
+          return
+        }
+
+        setPublicProfileEntries(
+          payload.entries.map((row) => ({
+            kitId: row.kitId,
+            owned: row.owned,
+            wanted: row.wanted,
+            rating: row.rating,
+          })),
+        )
+        setPublicProfileMeta({
+          displayName: payload.displayName ?? "Member",
+          avatarUrl: payload.avatarUrl ?? null,
+        })
+        setPublicProfileError(null)
+      } catch {
+        if (!cancelled) {
+          setPublicProfileEntries([])
+          setPublicProfileError("Could not load this profile.")
+        }
+      } finally {
+        if (!cancelled) {
+          setPublicProfileLoading(false)
+        }
+      }
+    }
+
+    void loadPublicProfile()
+
+    return () => {
+      cancelled = true
+    }
+  }, [showProfile, profileUserId, currentUser])
+
+  const isOwnProfile = useMemo(
+    () =>
+      Boolean(
+        showProfile && profileUserId && currentUser && currentUser.id === profileUserId,
+      ),
+    [showProfile, profileUserId, currentUser],
+  )
+
+  const profileViewEntries = useMemo(() => {
+    if (showProfile && profileUserId) {
+      if (currentUser && profileUserId === currentUser.id) {
+        return savedKitEntries
+      }
+      return publicProfileEntries
+    }
+    return savedKitEntries
+  }, [
+    showProfile,
+    profileUserId,
+    currentUser,
+    savedKitEntries,
+    publicProfileEntries,
+  ])
+
+  useEffect(() => {
+    const ids = profileViewEntries.map((entry) => entry.kitId)
 
     if (ids.length === 0) {
       setProfileKits([])
@@ -1255,7 +1423,7 @@ export function KitRoomShell({
     return () => {
       isMounted = false
     }
-  }, [savedKitEntries])
+  }, [profileViewEntries])
 
   useEffect(() => {
     const canvas = exploreViewportRef.current
@@ -1358,7 +1526,35 @@ export function KitRoomShell({
   }, [viewMode])
 
   useEffect(() => {
-    if (!selectedKit || !currentUser) {
+    if (!selectedKit) {
+      setUserKitState(emptyUserKitState)
+      setUserKitStateLoading(false)
+      setKitStateNotice(null)
+      return
+    }
+
+    const viewingSomeoneElseProfile =
+      showProfile &&
+      profileUserId &&
+      (!currentUser || profileUserId !== currentUser.id)
+
+    if (viewingSomeoneElseProfile) {
+      const entry = publicProfileEntries.find((e) => e.kitId === selectedKit.id)
+      setUserKitState(
+        entry
+          ? {
+              owned: entry.owned,
+              wanted: entry.wanted,
+              rating: entry.rating,
+            }
+          : emptyUserKitState,
+      )
+      setUserKitStateLoading(false)
+      setKitStateNotice(null)
+      return
+    }
+
+    if (!currentUser) {
       setUserKitState(emptyUserKitState)
       setUserKitStateLoading(false)
       setKitStateNotice(null)
@@ -1402,7 +1598,14 @@ export function KitRoomShell({
     return () => {
       isMounted = false
     }
-  }, [browserSupabase, currentUser, selectedKit])
+  }, [
+    browserSupabase,
+    currentUser,
+    profileUserId,
+    publicProfileEntries,
+    selectedKit,
+    showProfile,
+  ])
 
   async function loadFindPage({
     offset,
@@ -1577,31 +1780,45 @@ export function KitRoomShell({
     () => getUserDisplayName(currentUser),
     [currentUser],
   )
+  const profilePageDisplayName = useMemo(() => {
+    if (isOwnProfile && currentUser) {
+      return getUserDisplayName(currentUser)
+    }
+    return publicProfileMeta.displayName
+  }, [isOwnProfile, currentUser, publicProfileMeta.displayName])
+  const profilePageAvatarUrl = useMemo(() => {
+    if (isOwnProfile && currentUser) {
+      return getUserAvatarUrl(currentUser)
+    }
+    return publicProfileMeta.avatarUrl
+  }, [isOwnProfile, currentUser, publicProfileMeta.avatarUrl])
   const ownedKits = useMemo(() => {
-    return savedKitEntries
+    return profileViewEntries
       .filter((entry) => entry.owned)
       .map((entry) => kitsById.get(entry.kitId))
       .filter((kit): kit is CatalogKit => Boolean(kit))
-  }, [kitsById, savedKitEntries])
+  }, [kitsById, profileViewEntries])
   const wantedKits = useMemo(() => {
-    return savedKitEntries
+    return profileViewEntries
       .filter((entry) => entry.wanted)
       .map((entry) => kitsById.get(entry.kitId))
       .filter((kit): kit is CatalogKit => Boolean(kit))
-  }, [kitsById, savedKitEntries])
+  }, [kitsById, profileViewEntries])
   const ratedKits = useMemo(() => {
-    return savedKitEntries
+    return profileViewEntries
       .filter((entry) => entry.rating !== null)
       .sort((left, right) => (right.rating ?? 0) - (left.rating ?? 0))
       .map((entry) => kitsById.get(entry.kitId))
       .filter((kit): kit is CatalogKit => Boolean(kit))
-  }, [kitsById, savedKitEntries])
+  }, [kitsById, profileViewEntries])
   const activeProfileSection = useMemo(() => {
     if (profileTab === "owned") {
       return {
         title: "Owned",
         kits: ownedKits,
-        emptyMessage: "No kits in your owned list yet.",
+        emptyMessage: isOwnProfile
+          ? "No kits in your owned list yet."
+          : "No owned kits yet.",
       }
     }
 
@@ -1609,16 +1826,20 @@ export function KitRoomShell({
       return {
         title: "Want",
         kits: wantedKits,
-        emptyMessage: "No kits in your want list yet.",
+        emptyMessage: isOwnProfile
+          ? "No kits in your want list yet."
+          : "No wanted kits yet.",
       }
     }
 
     return {
       title: "Rated",
       kits: ratedKits,
-      emptyMessage: "You have not rated any kits yet.",
+      emptyMessage: isOwnProfile
+        ? "You have not rated any kits yet."
+        : "No rated kits yet.",
     }
-  }, [ownedKits, profileTab, ratedKits, wantedKits])
+  }, [isOwnProfile, ownedKits, profileTab, ratedKits, wantedKits])
 
   const orderedBrandOptions = useMemo(
     () => orderFilterOptions(catalogSummary.brands, preferredBrandOrder),
@@ -1872,26 +2093,19 @@ export function KitRoomShell({
   }
 
   if (showProfile && !authResolved) {
-    return <main className="min-h-screen bg-white pb-20" />
+    return (
+      <main className="min-h-screen bg-white pb-20">
+        <p className="mx-auto max-w-6xl px-4 pt-20 text-[14px] text-[#777] sm:px-6 lg:px-8">
+          Loading profile…
+        </p>
+      </main>
+    )
   }
 
-  if (showProfile && currentUser) {
-    if (profileUserId && currentUser.id !== profileUserId) {
-      return (
-        <main className="min-h-screen bg-white pb-20">
-          <section className="mx-auto max-w-3xl px-4 pb-12 pt-20 sm:px-6 lg:px-8">
-            <div className="slide-up space-y-4">
-              <h1 className="text-4xl font-light tracking-[-0.04em] text-[#111]">
-                This profile is private
-              </h1>
-              <p className="text-[15px] leading-8 text-[#666]">
-                You can only view your own saved kits from this route.
-              </p>
-            </div>
-          </section>
-        </main>
-      )
-    }
+  if (showProfile && profileUserId) {
+    const profileListLoading = isOwnProfile
+      ? savedKitEntriesLoading || profileKitsLoading
+      : publicProfileLoading || profileKitsLoading
 
     return (
       <main className="min-h-screen bg-white pb-20">
@@ -1899,10 +2113,10 @@ export function KitRoomShell({
           <div className="space-y-10">
             <div className="flex w-full min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 items-center gap-4">
-                {currentUserAvatarUrl ? (
+                {profilePageAvatarUrl ? (
                   <img
-                    src={getImageProxyUrl(currentUserAvatarUrl)}
-                    alt={`${currentUserDisplayName} profile`}
+                    src={getImageProxyUrl(profilePageAvatarUrl)}
+                    alt={`${profilePageDisplayName} profile`}
                     className="shrink-0 rounded-full object-cover"
                     style={{ width: "44px", height: "44px" }}
                   />
@@ -1911,35 +2125,42 @@ export function KitRoomShell({
                     className="flex shrink-0 items-center justify-center rounded-full bg-[#f2f2f2] text-[14px] uppercase text-[#777]"
                     style={{ width: "44px", height: "44px" }}
                   >
-                    {(currentUser.email ?? "U").slice(0, 1)}
+                    {profilePageDisplayName.slice(0, 1).toUpperCase()}
                   </div>
                 )}
 
                 <div className="min-w-0 space-y-1">
                   <h1 className="text-3xl font-light tracking-[-0.04em] text-[#111]">
-                    {currentUserDisplayName}
+                    {profilePageDisplayName}
                   </h1>
                   <p className="text-[14px] text-[#888]">
-                    {formatCount(ratedKits.length)} rated · {formatCount(ownedKits.length)} owned · {formatCount(wantedKits.length)} want
+                    {formatCount(ratedKits.length)} rated · {formatCount(ownedKits.length)} owned ·{" "}
+                    {formatCount(wantedKits.length)} want
                   </p>
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => void handleSignOut()}
-                className="inline-flex shrink-0 items-center self-end rounded border border-[var(--line)] bg-white px-2 py-0.5 font-[family-name:var(--font-sans),sans-serif] transition hover:border-[#d8d8d8] hover:bg-[#fafafa] sm:self-auto"
-              >
-                {/* Span: global `button { font: inherit }` runs after Tailwind and can
-                    override text-* utilities on the button element itself. */}
-                <span className="text-[11px] font-normal leading-none text-[#666] transition hover:text-[#333]">
-                  Sign out
-                </span>
-              </button>
+              {isOwnProfile ? (
+                <button
+                  type="button"
+                  onClick={() => void handleSignOut()}
+                  className="inline-flex shrink-0 items-center self-end rounded border border-[var(--line)] bg-white px-2 py-0.5 font-[family-name:var(--font-sans),sans-serif] transition hover:border-[#d8d8d8] hover:bg-[#fafafa] sm:self-auto"
+                >
+                  <span className="text-[11px] font-normal leading-none text-[#666] transition hover:text-[#333]">
+                    Sign out
+                  </span>
+                </button>
+              ) : null}
             </div>
 
-            {savedKitEntriesLoading || profileKitsLoading ? (
-              <p className="text-[14px] text-[#777]">Loading your saved kits...</p>
+            {publicProfileError && !isOwnProfile ? (
+              <p className="text-[14px] text-[#b45353]">{publicProfileError}</p>
+            ) : null}
+
+            {profileListLoading ? (
+              <p className="text-[14px] text-[#777]">
+                {isOwnProfile ? "Loading your saved kits..." : "Loading kits..."}
+              </p>
             ) : (
               <div className="space-y-8">
                 <div className="inline-flex items-center rounded-full border border-[var(--line)] bg-[#fafafa] p-1 text-[13px]">
@@ -2003,32 +2224,8 @@ export function KitRoomShell({
           onToggleWanted={handleWantedToggle}
           onRatingChange={handleRatingChange}
           onClose={() => setSelectedKit(null)}
+          readOnly={!isOwnProfile}
         />
-      </main>
-    )
-  }
-
-  if (showProfile && !currentUser) {
-    return (
-      <main className="min-h-screen bg-white pb-20">
-        <section className="mx-auto max-w-3xl px-4 pb-12 pt-20 sm:px-6 lg:px-8">
-          <div className="slide-up space-y-4">
-            <h1 className="text-4xl font-light tracking-[-0.04em] text-[#111]">
-              Sign in to view your profile
-            </h1>
-            <p className="text-[15px] leading-8 text-[#666]">
-              Your saved kits live at a unique profile route, but you need to be
-              signed in to access them.
-            </p>
-            <button
-              type="button"
-              onClick={openAuthDialog}
-              className="rounded-full bg-[#111] px-4 py-2 text-[13px] text-white"
-            >
-              Login / Sign up
-            </button>
-          </div>
-        </section>
       </main>
     )
   }
