@@ -785,22 +785,13 @@ function KitCard({
   kit,
   onSelect,
   onImageError,
-  animateIn = false,
-  animationDelayMs = 0,
 }: {
   kit: CatalogKit
   onSelect: (kit: CatalogKit) => void
   onImageError: (kitId: number) => void
-  animateIn?: boolean
-  animationDelayMs?: number
 }) {
   return (
-    <button
-      className={`group text-center ${animateIn ? "slide-up" : ""}`}
-      onClick={() => onSelect(kit)}
-      type="button"
-      style={animateIn ? { animationDelay: `${animationDelayMs}ms` } : undefined}
-    >
+    <button className="group text-center" onClick={() => onSelect(kit)} type="button">
       <article className="transition duration-200 hover:opacity-85">
         <ShirtTile kit={kit} onImageError={onImageError} />
         <div className="mx-auto mt-3 max-w-[11.4rem] space-y-0.5">
@@ -816,16 +807,21 @@ function KitCard({
   )
 }
 
-function ExploreKitCard({
+/** Same motion as Explore: hidden until near/in view, then slide-up + lazy image fade-in. */
+function CatalogKitCard({
   kit,
   onSelect,
   onImageError,
   viewportRoot,
+  observeDocumentViewport = false,
 }: {
   kit: CatalogKit
   onSelect: (kit: CatalogKit) => void
   onImageError: (kitId: number) => void
+  /** Scroll container for Explore; ignored when `observeDocumentViewport` is true. */
   viewportRoot: HTMLElement | null
+  /** Find uses window scroll; Explore uses `viewportRoot` once the pane ref is ready. */
+  observeDocumentViewport?: boolean
 }) {
   const cardRef = useRef<HTMLButtonElement>(null)
   const [hasEnteredView, setHasEnteredView] = useState(false)
@@ -835,7 +831,11 @@ function ExploreKitCard({
   useEffect(() => {
     const node = cardRef.current
 
-    if (!node || !viewportRoot) {
+    if (!node) {
+      return
+    }
+
+    if (!observeDocumentViewport && !viewportRoot) {
       return
     }
 
@@ -851,7 +851,7 @@ function ExploreKitCard({
         setShouldLoadImage(true)
       },
       {
-        root: viewportRoot,
+        root: observeDocumentViewport ? null : viewportRoot,
         rootMargin: "320px",
         threshold: 0.08,
       },
@@ -860,7 +860,7 @@ function ExploreKitCard({
     observer.observe(node)
 
     return () => observer.disconnect()
-  }, [viewportRoot])
+  }, [observeDocumentViewport, viewportRoot])
 
   return (
     <button
@@ -892,45 +892,48 @@ function ExploreKitCard({
   )
 }
 
+const FIND_GRID_SKELETON_PLACEHOLDERS = 18
+
+function FindGridSkeleton() {
+  return (
+    <div className="mx-auto mt-16 grid max-w-7xl gap-x-5 gap-y-10 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+      {Array.from({ length: FIND_GRID_SKELETON_PLACEHOLDERS }).map((_, index) => (
+        <div
+          key={index}
+          className="text-center fade-in"
+          style={{ animationDelay: `${Math.min(index * 18, 280)}ms` }}
+        >
+          <div className="mx-auto aspect-[3/4] w-full max-w-[11.4rem] animate-pulse rounded-[4px] bg-[#f0f0f0]" />
+          <div className="mx-auto mt-3 space-y-2">
+            <div className="mx-auto h-3 w-24 animate-pulse rounded bg-[#ececec]" />
+            <div className="mx-auto h-2 w-20 animate-pulse rounded bg-[#ececec]" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 const KitGrid = memo(function KitGrid({
   kits,
   onSelect,
   onImageError,
-  animateFirstCount = 0,
-  animateRange,
 }: {
   kits: CatalogKit[]
   onSelect: (kit: CatalogKit) => void
   onImageError: (kitId: number) => void
-  animateFirstCount?: number
-  animateRange?: { start: number; end: number } | null
 }) {
   return (
     <div className="mx-auto mt-16 grid max-w-7xl gap-x-5 gap-y-10 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-      {kits.map((kit, index) => (
-        (() => {
-          const animationRangeStart = animateRange?.start ?? 0
-          const isInInitialRange = index < animateFirstCount
-          const isInAnimatedRange =
-            animateRange ? index >= animationRangeStart && index < animateRange.end : false
-          const animateIn = isInInitialRange || isInAnimatedRange
-          const animationDelayMs = isInInitialRange
-            ? Math.min(index * 18, 280)
-            : isInAnimatedRange
-              ? Math.min((index - animationRangeStart) * 18, 280)
-              : 0
-
-          return (
-        <KitCard
+      {kits.map((kit) => (
+        <CatalogKitCard
           key={kit.id}
           kit={kit}
           onSelect={onSelect}
           onImageError={onImageError}
-          animateIn={animateIn}
-          animationDelayMs={animationDelayMs}
+          viewportRoot={null}
+          observeDocumentViewport
         />
-          )
-        })()
       ))}
     </div>
   )
@@ -996,10 +999,6 @@ export function KitRoomShell({
   const [findLoading, setFindLoading] = useState(false)
   const [findLoadingMore, setFindLoadingMore] = useState(false)
   const [findError, setFindError] = useState<string | null>(null)
-  const [findAnimatedRange, setFindAnimatedRange] = useState<{
-    start: number
-    end: number
-  } | null>(null)
   const [selectedKit, setSelectedKit] = useState<CatalogKit | null>(null)
   const [showAbout] = useState(initialRoute === "about")
   const [showProfile] = useState(initialRoute === "profile")
@@ -1462,18 +1461,13 @@ export function KitRoomShell({
         return
       }
 
-      let appendStart = 0
       setFindKits((current) => {
         if (!append) {
           return payload.kits
         }
 
-        appendStart = current.length
         return [...current, ...payload.kits]
       })
-      setFindAnimatedRange(
-        append ? { start: appendStart, end: appendStart + payload.kits.length } : null,
-      )
       setFindTotalCount(payload.totalCount)
       setFindHasMore(payload.hasMore)
     } catch (error) {
@@ -1529,18 +1523,6 @@ export function KitRoomShell({
 
     void loadFindPage({ offset: 0, append: false })
   }, [findPageSize])
-
-  useEffect(() => {
-    if (!findAnimatedRange) {
-      return
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setFindAnimatedRange(null)
-    }, 800)
-
-    return () => window.clearTimeout(timeoutId)
-  }, [findAnimatedRange])
 
   useEffect(() => {
     const node = findLoadMoreRef.current
@@ -1946,9 +1928,13 @@ export function KitRoomShell({
               <button
                 type="button"
                 onClick={() => void handleSignOut()}
-                className="shrink-0 self-end rounded-md border border-[var(--line)] bg-white px-3 py-2 font-[family-name:var(--font-sans),sans-serif] text-[13px] font-medium text-[#333] shadow-sm transition hover:border-[#ccc] hover:bg-[#fafafa] sm:self-auto"
+                className="inline-flex shrink-0 items-center self-end rounded border border-[var(--line)] bg-white px-2 py-0.5 font-[family-name:var(--font-sans),sans-serif] transition hover:border-[#d8d8d8] hover:bg-[#fafafa] sm:self-auto"
               >
-                Sign out
+                {/* Span: global `button { font: inherit }` runs after Tailwind and can
+                    override text-* utilities on the button element itself. */}
+                <span className="text-[11px] font-normal leading-none text-[#666] transition hover:text-[#333]">
+                  Sign out
+                </span>
               </button>
             </div>
 
@@ -2048,7 +2034,13 @@ export function KitRoomShell({
   }
 
   return (
-    <main className="min-h-screen bg-white pb-20">
+    <main
+      className={
+        viewMode === "find"
+          ? "min-h-screen bg-white pb-20"
+          : "min-h-screen bg-white"
+      }
+    >
       {viewMode === "find" ? (
         <section className="mx-auto max-w-6xl px-4 pb-16 pt-16 sm:px-6 lg:px-8">
           <div className="fade-in mx-auto max-w-3xl text-center">
@@ -2169,17 +2161,13 @@ export function KitRoomShell({
           ) : null}
 
           {findLoading && visibleFindKits.length === 0 ? (
-            <p className="mx-auto mt-12 max-w-3xl text-center text-[14px] text-[#9a9a9a]">
-              Loading kits...
-            </p>
+            <FindGridSkeleton />
           ) : (
             <>
               <KitGrid
                 kits={visibleFindKits}
                 onSelect={setSelectedKit}
                 onImageError={handleBrokenImage}
-                animateFirstCount={30}
-                animateRange={findAnimatedRange}
               />
 
               {!findLoadingMore && visibleFindKits.length === 0 ? (
@@ -2214,7 +2202,7 @@ export function KitRoomShell({
               }}
             >
               {visibleExploreKits.map((kit) => (
-                <ExploreKitCard
+                <CatalogKitCard
                   key={kit.id}
                   kit={kit}
                   onSelect={setSelectedKit}

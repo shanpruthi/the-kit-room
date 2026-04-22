@@ -83,14 +83,14 @@ input {
   }
 }
 
+/* Motion only — no opacity. Opacity in the same animation on a parent caused
+   intermittent invisible kit images on Find (stuck at 0 until hover repainted). */
 @keyframes slide-up {
   from {
-    opacity: 0;
     transform: translateY(24px);
   }
 
   to {
-    opacity: 1;
     transform: translateY(0);
   }
 }

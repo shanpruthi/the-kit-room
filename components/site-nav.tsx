@@ -137,11 +137,19 @@ export function SiteNav() {
     return () => window.removeEventListener(KIT_ROOM_OPEN_AUTH_EVENT, onOpenAuth)
   }, [])
 
-  const isHome = pathname === "/"
+  // `usePathname()` can lag or be null briefly (including right after OAuth redirect to
+  // `/#access_token=...` — pathname is still `/`, hash is ignored by pathname).
+  const isHome =
+    pathname === "/" ||
+    pathname === "" ||
+    (typeof window !== "undefined" &&
+      (window.location.pathname === "/" || window.location.pathname === "") &&
+      pathname == null)
+
   const isTrends =
-    pathname === "/trends" || pathname.startsWith("/trends/")
+    pathname === "/trends" || pathname?.startsWith("/trends/") === true
   const isAbout = pathname === "/about"
-  const isProfile = pathname.startsWith("/profile")
+  const isProfile = pathname?.startsWith("/profile") === true
 
   const currentUserAvatarUrl = getUserAvatarUrl(currentUser)
   const currentUserDisplayName = getUserDisplayName(currentUser)
