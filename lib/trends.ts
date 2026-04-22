@@ -77,15 +77,28 @@ function addAggregate(map: Map<string, Aggregate>, key: string, rating: number) 
   map.set(key, current)
 }
 
-function getClientForMemberRatings() {
-  return getSupabaseServiceRoleClient() ?? supabase
+/**
+ * Trends must use the service role so every `user_kit_states` row is visible.
+ * The anon client runs without a user session on the server and only sees what
+ * RLS allows — often a handful of rows or none, which makes charts look “stuck”
+ * even when `SUPABASE_SERVICE_ROLE_KEY` is set in Vercel (e.g. before redeploy).
+ */
+function getServiceClientForTrendsRatings() {
+  const client = getSupabaseServiceRoleClient()
+  if (!client) {
+    throw new Error(
+      "Trends cannot load member ratings: set SUPABASE_SERVICE_ROLE_KEY and NEXT_PUBLIC_SUPABASE_URL on the server, then redeploy. " +
+        "Without the service role, aggregates only reflect what anonymous RLS allows (usually wrong).",
+    )
+  }
+  return client
 }
 
 /** Sum and count of every member rating row, grouped by kit (ground truth for kit averages). */
 async function loadUserRatingAggregatesByKitId(): Promise<
   Map<number, { sum: number; count: number }>
 > {
-  const db = getClientForMemberRatings()
+  const db = getServiceClientForTrendsRatings()
   const agg = new Map<number, { sum: number; count: number }>()
   let offset = 0
 

@@ -78,6 +78,9 @@ type MultiSelectDropdownProps = {
   options: string[]
   selected: string[]
   onChange: (next: string[]) => void
+  /** Tighter control + label only on `md+` (for mobile filter rows). */
+  compact?: boolean
+  className?: string
 }
 
 type UserKitStateRow = {
@@ -343,6 +346,8 @@ function MultiSelectDropdown({
   options,
   selected,
   onChange,
+  compact = false,
+  className: wrapperClassName = "",
 }: MultiSelectDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -469,8 +474,17 @@ function MultiSelectDropdown({
       : null
 
   return (
-    <div ref={wrapperRef} className="relative space-y-1">
-      <span className="block text-[10px] uppercase tracking-[0.12em] text-[#9a9a9a]">
+    <div
+      ref={wrapperRef}
+      className={`relative ${compact ? "space-y-0.5 md:space-y-1" : "space-y-1"} ${wrapperClassName}`}
+    >
+      <span
+        className={`${
+          compact
+            ? "sr-only md:block"
+            : "block"
+        } text-[10px] uppercase tracking-[0.12em] text-[#9a9a9a]`}
+      >
         {label}
       </span>
       <button
@@ -480,10 +494,13 @@ function MultiSelectDropdown({
           event.preventDefault()
         }}
         onClick={() => setIsOpen((current) => !current)}
-        className="flex w-full items-center justify-between rounded-[8px] border border-[var(--line)] bg-white px-3 py-2 text-[10px] text-[#555]"
+        className={`flex w-full items-center justify-between rounded-[8px] border border-[var(--line)] bg-white text-[#555] ${
+          compact
+            ? "px-2 py-1.5 text-[9px] md:px-3 md:py-2 md:text-[10px]"
+            : "px-3 py-2 text-[10px]"
+        }`}
         style={{
           fontFamily: "var(--font-sans), sans-serif",
-          fontSize: "10px",
           fontWeight: 400,
           lineHeight: "1.2",
           color: "#555",
@@ -945,11 +962,11 @@ const FIND_GRID_SKELETON_PLACEHOLDERS = 18
 
 function FindGridSkeleton() {
   return (
-    <div className="mx-auto mt-16 grid max-w-7xl gap-x-5 gap-y-10 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+    <div className="mx-auto mt-10 grid max-w-7xl grid-cols-2 gap-x-2 gap-y-7 min-[380px]:grid-cols-3 min-[380px]:gap-x-3 sm:gap-x-5 sm:gap-y-10 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
       {Array.from({ length: FIND_GRID_SKELETON_PLACEHOLDERS }).map((_, index) => (
         <div
           key={index}
-          className="text-center fade-in"
+          className="min-w-0 text-center fade-in"
           style={{ animationDelay: `${Math.min(index * 18, 280)}ms` }}
         >
           <div className="mx-auto aspect-[3/4] w-full max-w-[11.4rem] animate-pulse rounded-[4px] bg-[#f0f0f0]" />
@@ -973,16 +990,17 @@ const KitGrid = memo(function KitGrid({
   onImageError: (kitId: number) => void
 }) {
   return (
-    <div className="mx-auto mt-16 grid max-w-7xl gap-x-5 gap-y-10 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+    <div className="mx-auto mt-10 grid max-w-7xl grid-cols-2 gap-x-2 gap-y-7 min-[380px]:grid-cols-3 min-[380px]:gap-x-3 sm:gap-x-5 sm:gap-y-10 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
       {kits.map((kit) => (
-        <CatalogKitCard
-          key={kit.id}
-          kit={kit}
-          onSelect={onSelect}
-          onImageError={onImageError}
-          viewportRoot={null}
-          observeDocumentViewport
-        />
+        <div key={kit.id} className="min-w-0">
+          <CatalogKitCard
+            kit={kit}
+            onSelect={onSelect}
+            onImageError={onImageError}
+            viewportRoot={null}
+            observeDocumentViewport
+          />
+        </div>
       ))}
     </div>
   )
@@ -2001,30 +2019,56 @@ export function KitRoomShell({
     }
 
     setLeft(
-      <div className="hidden items-center rounded-full border border-[var(--line)] bg-[#fafafa] p-1 text-[13px] md:inline-flex">
-        <button
-          type="button"
-          onClick={() => setViewMode("find")}
-          className={`rounded-full px-3 py-1 transition ${
-            viewMode === "find"
-              ? "bg-[#111] text-white"
-              : "text-[var(--muted)]"
-          }`}
-        >
-          Find
-        </button>
-        <button
-          type="button"
-          onClick={() => setViewMode("explore")}
-          className={`rounded-full px-3 py-1 transition ${
-            viewMode === "explore"
-              ? "bg-[#111] text-white"
-              : "text-[var(--muted)]"
-          }`}
-        >
-          Explore
-        </button>
-      </div>,
+      <>
+        <div className="inline-flex min-w-0 max-w-full shrink items-center overflow-hidden rounded-full border border-[var(--line)] bg-[#fafafa] p-0.5 text-[12px] leading-none md:hidden">
+          <button
+            type="button"
+            onClick={() => setViewMode("find")}
+            className={`shrink-0 rounded-full px-2.5 py-1.5 transition ${
+              viewMode === "find"
+                ? "bg-[#111] text-white"
+                : "text-[var(--muted)]"
+            }`}
+          >
+            Find
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("explore")}
+            className={`shrink-0 rounded-full px-2.5 py-1.5 transition ${
+              viewMode === "explore"
+                ? "bg-[#111] text-white"
+                : "text-[var(--muted)]"
+            }`}
+          >
+            Explore
+          </button>
+        </div>
+        <div className="hidden items-center rounded-full border border-[var(--line)] bg-[#fafafa] p-1 text-[13px] md:inline-flex">
+          <button
+            type="button"
+            onClick={() => setViewMode("find")}
+            className={`rounded-full px-3 py-1 transition ${
+              viewMode === "find"
+                ? "bg-[#111] text-white"
+                : "text-[var(--muted)]"
+            }`}
+          >
+            Find
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("explore")}
+            className={`rounded-full px-3 py-1 transition ${
+              viewMode === "explore"
+                ? "bg-[#111] text-white"
+                : "text-[var(--muted)]"
+            }`}
+          >
+            Explore
+          </button>
+        </div>
+      </>,
     )
     return () => setLeft(null)
   }, [
@@ -2239,113 +2283,126 @@ export function KitRoomShell({
       }
     >
       {viewMode === "find" ? (
-        <section className="mx-auto max-w-6xl px-4 pb-16 pt-16 sm:px-6 lg:px-8">
-          <div className="fade-in mx-auto max-w-3xl text-center">
-            <h1 className="text-5xl font-light tracking-[-0.05em] text-[#111] sm:text-6xl">
-              The Kit Room
-            </h1>
-            <p className="mt-5 text-[14px] text-[var(--muted)]">
-              {formatCount(catalogSummary.teamsCount)} teams · {formatCount(catalogSummary.kitsCount)} kits
-            </p>
-          </div>
-
-          <div className="slide-up mx-auto mt-8 flex justify-center">
-            <div className="relative isolate w-full max-w-[34rem]">
-              <span
-                className="pointer-events-none absolute bottom-0 left-0 top-0 z-10 flex w-12 items-center justify-center text-[#888]"
-                aria-hidden
-              >
-                <span className="text-[24px] leading-none">⌕</span>
-              </span>
-              <input
-                ref={searchInputRef}
-                value={search}
-                onChange={(event) => {
-                  setSearch(event.target.value)
-                }}
-                placeholder="Search clubs, years, brands..."
-                className="relative z-0 w-full rounded-[8px] border border-[var(--line)] bg-white py-[0.625rem] pl-12 pr-[3.25rem] text-[14px] text-[#555] outline-none transition placeholder:text-[14px] focus:border-[#d3d3d3]"
-              />
-              <div className="absolute bottom-0 right-0 top-0 z-10 flex items-center pr-2">
-                {search ? (
-                  <button
-                    type="button"
-                    onClick={() => setSearch("")}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[17px] leading-none text-[#9a9a9a] transition hover:bg-[#f0f0f0] hover:text-[#555]"
-                    aria-label="Clear search"
+        <section className="mx-auto max-w-6xl px-4 pb-16 pt-2 sm:px-6 sm:pt-8 md:pt-16 lg:px-8">
+          <div className="fade-in flex flex-col">
+            <div className="slide-up order-1 w-full md:order-2 md:mt-8">
+              <div className="mx-auto flex justify-center">
+                <div className="relative isolate w-full max-w-[34rem]">
+                  <span
+                    className="pointer-events-none absolute bottom-0 left-0 top-0 z-10 flex w-12 items-center justify-center text-[#888]"
+                    aria-hidden
                   >
-                    ×
-                  </button>
-                ) : (
-                  <span className="inline-flex h-7 min-w-[1.75rem] items-center justify-center rounded border border-[#ebebeb] bg-[#f5f5f5] px-1.5 text-[11px] font-medium leading-none text-[#9a9a9a]">
-                    /
+                    <span className="text-[24px] leading-none">⌕</span>
                   </span>
-                )}
+                  <input
+                    ref={searchInputRef}
+                    value={search}
+                    onChange={(event) => {
+                      setSearch(event.target.value)
+                    }}
+                    placeholder="Search clubs, years, brands..."
+                    className="relative z-0 w-full rounded-[8px] border border-[var(--line)] bg-white py-[0.625rem] pl-12 pr-[3.25rem] text-[14px] text-[#555] outline-none transition placeholder:text-[14px] focus:border-[#d3d3d3]"
+                  />
+                  <div className="absolute bottom-0 right-0 top-0 z-10 flex items-center pr-2">
+                    {search ? (
+                      <button
+                        type="button"
+                        onClick={() => setSearch("")}
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[17px] leading-none text-[#9a9a9a] transition hover:bg-[#f0f0f0] hover:text-[#555]"
+                        aria-label="Clear search"
+                      >
+                        ×
+                      </button>
+                    ) : (
+                      <span className="inline-flex h-7 min-w-[1.75rem] items-center justify-center rounded border border-[#ebebeb] bg-[#f5f5f5] px-1.5 text-[11px] font-medium leading-none text-[#9a9a9a]">
+                        /
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="filter-controls slide-up mx-auto mt-6 flex justify-center">
-            <div className="w-full lg:w-auto">
-              <div className="mx-auto grid w-full max-w-[23rem] gap-2 text-left sm:max-w-[30rem] sm:grid-cols-2 lg:max-w-none lg:[grid-template-columns:repeat(4,11rem)_auto]">
-                <MultiSelectDropdown
-                  label="Decade"
-                  placeholder="All Decades"
-                  options={catalogSummary.decades}
-                  selected={activeDecades}
-                  onChange={setActiveDecades}
-                />
+            <div className="order-2 mx-auto mt-6 max-w-3xl text-center md:order-1 md:mt-0">
+              <h1 className="text-5xl font-light tracking-[-0.05em] text-[#111] sm:text-6xl">
+                The Kit Room
+              </h1>
+              <p className="mt-5 text-[14px] text-[var(--muted)]">
+                {formatCount(catalogSummary.teamsCount)} teams · {formatCount(catalogSummary.kitsCount)} kits
+              </p>
+            </div>
 
-                <MultiSelectDropdown
-                  label="Brand"
-                  placeholder="All Brands"
-                  options={orderedBrandOptions}
-                  selected={activeBrands}
-                  onChange={setActiveBrands}
-                />
+            <div className="filter-controls slide-up order-3 mx-auto mt-4 flex w-full min-w-0 max-w-full justify-stretch md:mt-6 md:max-w-none md:justify-center">
+              <div className="w-full min-w-0 max-w-full lg:w-auto">
+                {/*
+                  Mobile: 2×2 (Decade | Brand / Type | Color) + full-width reset.
+                  md–lg: 2-column grid; lg+: 4 filter columns + reset.
+                */}
+                <div className="mx-auto grid w-full min-w-0 max-w-full grid-cols-2 gap-x-3 gap-y-2.5 text-left max-md:max-w-md max-md:mx-auto md:max-w-[30rem] md:gap-2 lg:max-w-none lg:grid-cols-[repeat(4,11rem)_minmax(0,auto)] lg:gap-2">
+                  <MultiSelectDropdown
+                    className="min-w-0"
+                    label="Decade"
+                    placeholder="All Decades"
+                    options={catalogSummary.decades}
+                    selected={activeDecades}
+                    onChange={setActiveDecades}
+                  />
 
-                <MultiSelectDropdown
-                  label="Kit Type"
-                  placeholder="All Types"
-                  options={orderedKitTypeOptions}
-                  selected={activeKitTypes}
-                  onChange={setActiveKitTypes}
-                />
+                  <MultiSelectDropdown
+                    className="min-w-0"
+                    label="Brand"
+                    placeholder="All Brands"
+                    options={orderedBrandOptions}
+                    selected={activeBrands}
+                    onChange={setActiveBrands}
+                  />
 
-                <MultiSelectDropdown
-                  label="Color"
-                  placeholder="All Colors"
-                  options={colorOptions.map((option) => option.name)}
-                  selected={activeColors}
-                  onChange={setActiveColors}
-                />
+                  <MultiSelectDropdown
+                    className="min-w-0"
+                    label="Kit Type"
+                    placeholder="All Types"
+                    options={orderedKitTypeOptions}
+                    selected={activeKitTypes}
+                    onChange={setActiveKitTypes}
+                  />
 
-                <div className="flex items-center pt-[18px] lg:justify-start">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveDecades([])
-                      setActiveBrands([])
-                      setActiveKitTypes([])
-                      setActiveColors([])
-                    }}
-                    className="inline-flex cursor-pointer items-center px-0 pb-2 font-normal text-[#777] underline decoration-[0.5px] underline-offset-2"
-                    style={{
-                      all: "unset",
-                      cursor: "pointer",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      fontFamily: "var(--font-sans), sans-serif",
-                      fontSize: "11px",
-                      fontWeight: 400,
-                      lineHeight: "1.2",
-                      color: "#777",
-                      textDecoration: "underline",
-                      textUnderlineOffset: "2px",
-                    }}
-                  >
-                    Reset filters
-                  </button>
+                  <MultiSelectDropdown
+                    className="min-w-0"
+                    label="Color"
+                    placeholder="All Colors"
+                    options={colorOptions.map((option) => option.name)}
+                    selected={activeColors}
+                    onChange={setActiveColors}
+                  />
+
+                  <div className="col-span-2 flex w-full items-end justify-center pt-1 md:items-center md:pt-[10px] lg:col-span-1 lg:justify-start lg:pt-[18px]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveDecades([])
+                        setActiveBrands([])
+                        setActiveKitTypes([])
+                        setActiveColors([])
+                      }}
+                      className="inline-flex h-[1.85rem] cursor-pointer items-center whitespace-nowrap rounded-lg px-0 font-normal text-[#777] underline decoration-[0.5px] underline-offset-2 md:pb-2"
+                      style={{
+                        all: "unset",
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        fontFamily: "var(--font-sans), sans-serif",
+                        fontSize: "11px",
+                        fontWeight: 400,
+                        lineHeight: "1.2",
+                        color: "#777",
+                        textDecoration: "underline",
+                        textUnderlineOffset: "2px",
+                      }}
+                    >
+                      <span className="md:hidden">Reset</span>
+                      <span className="hidden md:inline">Reset filters</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

@@ -54,6 +54,9 @@ export default async function TrendsPage() {
             <p className="mt-3 text-3xl font-light tracking-[-0.04em] text-[#111]">
               {formatCount(data.summary.ratedKitsCount)}
             </p>
+            <p className="mt-2 text-[11px] leading-snug text-[#9a9a9a]">
+              Distinct catalog kits with at least one member rating (not total rating rows).
+            </p>
           </div>
           <div className="rounded-[14px] border border-[var(--line)] bg-[#fafafa] p-5">
             <p className="text-[10px] uppercase tracking-[0.14em] text-[#9a9a9a]">
