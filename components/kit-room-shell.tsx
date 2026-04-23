@@ -424,10 +424,10 @@ function MultiSelectDropdown({
             <button
               type="button"
               onClick={() => onChange([])}
-              className="mb-1 w-full rounded-[6px] px-2 py-1.5 text-left text-[10px] text-[#888] hover:bg-[#f7f7f7]"
+              className="mb-1 w-full rounded-[6px] px-2 py-1.5 text-left text-[11px] text-[#888] hover:bg-[#f7f7f7]"
               style={{
                 fontFamily: "var(--font-sans), sans-serif",
-                fontSize: "10px",
+                fontSize: "11px",
                 fontWeight: 400,
                 lineHeight: "1.2",
                 color: "#888",
@@ -445,7 +445,7 @@ function MultiSelectDropdown({
                     className="flex cursor-pointer items-center gap-2 rounded-[6px] px-2 py-1.5 text-[11px] text-[#555] hover:bg-[#f7f7f7]"
                     style={{
                       fontFamily: "var(--font-sans), sans-serif",
-                      fontSize: "10px",
+                      fontSize: "11px",
                       fontWeight: 400,
                       lineHeight: "1.2",
                       color: "#555",
@@ -483,7 +483,7 @@ function MultiSelectDropdown({
           compact
             ? "sr-only md:block"
             : "block"
-        } text-[10px] uppercase tracking-[0.12em] text-[#9a9a9a]`}
+        } text-[11px] uppercase leading-[1.2] tracking-[0.12em] text-[#9a9a9a]`}
       >
         {label}
       </span>
@@ -494,20 +494,21 @@ function MultiSelectDropdown({
           event.preventDefault()
         }}
         onClick={() => setIsOpen((current) => !current)}
-        className={`flex w-full items-center justify-between rounded-[8px] border border-[var(--line)] bg-white text-[#555] ${
+        className={`flex w-full items-center justify-between rounded-[8px] border border-[var(--line)] bg-white text-[11px] text-[#555] ${
           compact
-            ? "px-2 py-1.5 text-[9px] md:px-3 md:py-2 md:text-[10px]"
-            : "px-3 py-2 text-[10px]"
+            ? "px-2 py-1.5 md:px-3 md:py-2"
+            : "px-3 py-1.5"
         }`}
         style={{
           fontFamily: "var(--font-sans), sans-serif",
+          fontSize: "11px",
           fontWeight: 400,
           lineHeight: "1.2",
           color: "#555",
         }}
       >
         <span className="truncate">{buttonLabel}</span>
-        <span className="ml-3 text-[10px] text-[#888]">▾</span>
+        <span className="ml-2 shrink-0 text-[11px] leading-[1.2] text-[#888]">▾</span>
       </button>
       {dropdownPanel}
     </div>
@@ -2155,45 +2156,52 @@ export function KitRoomShell({
       <main className="min-h-screen bg-white pb-20">
         <section className="mx-auto max-w-6xl px-4 pb-16 pt-16 sm:px-6 lg:px-8">
           <div className="space-y-10">
-            <div className="flex w-full min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex min-w-0 items-center gap-4">
-                {profilePageAvatarUrl ? (
-                  <img
-                    src={getImageProxyUrl(profilePageAvatarUrl)}
-                    alt={`${profilePageDisplayName} profile`}
-                    className="shrink-0 rounded-full object-cover"
-                    style={{ width: "44px", height: "44px" }}
-                  />
-                ) : (
-                  <div
-                    className="flex shrink-0 items-center justify-center rounded-full bg-[#f2f2f2] text-[14px] uppercase text-[#777]"
-                    style={{ width: "44px", height: "44px" }}
-                  >
-                    {profilePageDisplayName.slice(0, 1).toUpperCase()}
-                  </div>
-                )}
-
-                <div className="min-w-0 space-y-1">
-                  <h1 className="text-3xl font-light tracking-[-0.04em] text-[#111]">
-                    {profilePageDisplayName}
-                  </h1>
-                  <p className="text-[14px] text-[#888]">
-                    {formatCount(ratedKits.length)} rated · {formatCount(ownedKits.length)} owned ·{" "}
-                    {formatCount(wantedKits.length)} want
-                  </p>
+            <div
+              className={`grid w-full min-w-0 items-start gap-x-4 [grid-template-columns:44px_minmax(0,1fr)] ${
+                isOwnProfile ? "gap-y-2.5" : "gap-y-0"
+              }`}
+            >
+              {profilePageAvatarUrl ? (
+                <img
+                  src={getImageProxyUrl(profilePageAvatarUrl)}
+                  alt={`${profilePageDisplayName} profile`}
+                  className="shrink-0 rounded-full object-cover"
+                  style={{ width: "44px", height: "44px" }}
+                />
+              ) : (
+                <div
+                  className="flex shrink-0 items-center justify-center rounded-full bg-[#f2f2f2] text-[14px] uppercase text-[#777]"
+                  style={{ width: "44px", height: "44px" }}
+                >
+                  {profilePageDisplayName.slice(0, 1).toUpperCase()}
                 </div>
+              )}
+
+              <div className="min-w-0 space-y-1">
+                <h1 className="text-3xl font-light tracking-[-0.04em] text-[#111]">
+                  {profilePageDisplayName}
+                </h1>
+                <p className="text-[14px] text-[#888]">
+                  {formatCount(ratedKits.length)} rated · {formatCount(ownedKits.length)} owned ·{" "}
+                  {formatCount(wantedKits.length)} want
+                </p>
               </div>
 
               {isOwnProfile ? (
-                <button
-                  type="button"
-                  onClick={() => void handleSignOut()}
-                  className="inline-flex shrink-0 items-center self-end rounded border border-[var(--line)] bg-white px-2 py-0.5 font-[family-name:var(--font-sans),sans-serif] transition hover:border-[#d8d8d8] hover:bg-[#fafafa] sm:self-auto"
-                >
-                  <span className="text-[11px] font-normal leading-none text-[#666] transition hover:text-[#333]">
-                    Sign out
-                  </span>
-                </button>
+                <>
+                  <div className="w-11 shrink-0" aria-hidden />
+                  <div className="self-start">
+                    <button
+                      type="button"
+                      onClick={() => void handleSignOut()}
+                      className="inline-flex items-center rounded border border-[var(--line)] bg-white px-2 py-0.5 font-[family-name:var(--font-sans),sans-serif] transition hover:border-[#d8d8d8] hover:bg-[#fafafa]"
+                    >
+                      <span className="text-[11px] font-normal leading-none text-[#666] transition hover:text-[#333]">
+                        Sign out
+                      </span>
+                    </button>
+                  </div>
+                </>
               ) : null}
             </div>
 
