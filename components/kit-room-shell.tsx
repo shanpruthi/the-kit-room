@@ -15,7 +15,7 @@ import type { User } from "@supabase/supabase-js"
 import { useHeaderSlot } from "@/components/header-slot"
 import { KIT_ROOM_OPEN_AUTH_EVENT } from "@/components/site-nav"
 import { INITIAL_FIND_CATALOG_LIMIT } from "@/lib/api-catalog-limits"
-import { resolveAllowedImageSrc } from "@/lib/image-proxy-shared"
+import { resolveAllowedImageSrc, resolveCatalogImageSrc } from "@/lib/image-proxy-shared"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 import type { CatalogKit, CatalogPage, CatalogSummary, UserKitState } from "@/lib/types"
 
@@ -538,7 +538,7 @@ function ShirtTile({
   size?: "default" | "hero"
 }) {
   const resolvedImageSrc =
-    imageSrc === undefined ? getImageProxyUrl(kit.imageUrl) : imageSrc
+    imageSrc === undefined ? resolveCatalogImageSrc(kit.imageUrl) : imageSrc
   const emptyImageSettledRef = useRef(false)
 
   useLayoutEffect(() => {
@@ -661,7 +661,7 @@ function KitModal({
           <div className="flex items-center justify-center overflow-hidden rounded-[8px] border border-[var(--line)] bg-white">
             {imageUrl ? (
               <img
-                src={getImageProxyUrl(imageUrl)}
+                src={resolveCatalogImageSrc(imageUrl)}
                 alt={kit.title}
                 className="h-full max-h-[38rem] w-full object-contain"
               />
@@ -1800,7 +1800,10 @@ export function KitRoomShell({
     return merged
   }, [findKits, profileKits])
   const visibleFindKits = useMemo(() => {
-    return findKits.filter((kit) => !brokenImageIds.includes(kit.id))
+    return findKits.filter(
+      (kit) =>
+        Boolean(kit.imageUrl?.trim()) && !brokenImageIds.includes(kit.id),
+    )
   }, [brokenImageIds, findKits])
   const renderedImageIdSet = useMemo(() => new Set(renderedImageIds), [renderedImageIds])
   const initialFindBatchIds = useMemo(
@@ -1838,20 +1841,20 @@ export function KitRoomShell({
     return profileViewEntries
       .filter((entry) => entry.owned)
       .map((entry) => kitsById.get(entry.kitId))
-      .filter((kit): kit is CatalogKit => Boolean(kit))
+      .filter((kit): kit is CatalogKit => Boolean(kit?.imageUrl?.trim()))
   }, [kitsById, profileViewEntries])
   const wantedKits = useMemo(() => {
     return profileViewEntries
       .filter((entry) => entry.wanted)
       .map((entry) => kitsById.get(entry.kitId))
-      .filter((kit): kit is CatalogKit => Boolean(kit))
+      .filter((kit): kit is CatalogKit => Boolean(kit?.imageUrl?.trim()))
   }, [kitsById, profileViewEntries])
   const ratedKits = useMemo(() => {
     return profileViewEntries
       .filter((entry) => entry.rating !== null)
       .sort((left, right) => (right.rating ?? 0) - (left.rating ?? 0))
       .map((entry) => kitsById.get(entry.kitId))
-      .filter((kit): kit is CatalogKit => Boolean(kit))
+      .filter((kit): kit is CatalogKit => Boolean(kit?.imageUrl?.trim()))
   }, [kitsById, profileViewEntries])
   const activeProfileSection = useMemo(() => {
     if (profileTab === "owned") {
@@ -2135,7 +2138,7 @@ export function KitRoomShell({
             >
               {profilePageAvatarUrl ? (
                 <img
-                  src={getImageProxyUrl(profilePageAvatarUrl)}
+                  src={resolveAllowedImageSrc(profilePageAvatarUrl)}
                   alt={`${profilePageDisplayName} profile`}
                   className="shrink-0 rounded-full object-cover"
                   style={{ width: "44px", height: "44px" }}
@@ -2226,7 +2229,9 @@ export function KitRoomShell({
                 <ProfileSection
                   key={profileTab}
                   title={activeProfileSection.title}
-                  kits={activeProfileSection.kits}
+                  kits={activeProfileSection.kits.filter(
+                    (kit) => !brokenImageIds.includes(kit.id),
+                  )}
                   emptyMessage={activeProfileSection.emptyMessage}
                   onSelect={setSelectedKit}
                   onImageError={handleBrokenImage}

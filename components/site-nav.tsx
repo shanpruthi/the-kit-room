@@ -14,17 +14,10 @@ import {
 import { createPortal } from "react-dom"
 import type { User } from "@supabase/supabase-js"
 import { AuthDialog } from "@/components/auth-dialog"
+import { resolveAllowedImageSrc } from "@/lib/image-proxy-shared"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 
 export const KIT_ROOM_OPEN_AUTH_EVENT = "kit-room:open-auth"
-
-function getImageProxyUrl(url: string | null) {
-  if (!url) {
-    return ""
-  }
-
-  return `/api/image?src=${encodeURIComponent(url)}`
-}
 
 function getUserAvatarUrl(user: User | null) {
   const metadata = user?.user_metadata as Record<string, unknown> | undefined
@@ -288,7 +281,7 @@ export function SiteNav() {
           >
             {currentUserAvatarUrl ? (
               <img
-                src={getImageProxyUrl(currentUserAvatarUrl)}
+                src={resolveAllowedImageSrc(currentUserAvatarUrl)}
                 alt={`${currentUserDisplayName} profile`}
                 className="rounded-full object-cover"
                 style={{ width: "22px", height: "22px" }}
@@ -412,7 +405,7 @@ export function SiteNav() {
                     >
                       {currentUserAvatarUrl ? (
                         <img
-                          src={getImageProxyUrl(currentUserAvatarUrl)}
+                          src={resolveAllowedImageSrc(currentUserAvatarUrl)}
                           alt=""
                           className="rounded-full object-cover"
                           style={{ width: "22px", height: "22px" }}

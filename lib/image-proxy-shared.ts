@@ -65,3 +65,22 @@ export function resolveAllowedImageSrc(url: string | null | undefined): string {
 
   return `/api/image?src=${encodeURIComponent(trimmed)}`
 }
+
+/**
+ * Kit thumbnails and modal heroes always use `/api/image`. Some archives allow our
+ * server to fetch images but block anonymous browser hotlinks; direct URLs regressed
+ * with broken tiles for a subset of kits.
+ */
+export function resolveCatalogImageSrc(url: string | null | undefined): string {
+  if (typeof url !== "string") {
+    return ""
+  }
+
+  const trimmed = url.trim()
+
+  if (!trimmed) {
+    return ""
+  }
+
+  return `/api/image?src=${encodeURIComponent(trimmed)}`
+}
