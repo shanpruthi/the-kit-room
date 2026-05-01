@@ -1,9 +1,5 @@
 import { unstable_cache } from "next/cache"
-import {
-  getCatalogSummary,
-  getExploreKitCatalog,
-  getInitialFindCatalogPage,
-} from "@/lib/kits"
+import { getCatalogSummary, getInitialFindCatalogPage } from "@/lib/kits"
 import type { CatalogPage, CatalogSummary } from "@/lib/types"
 
 function buildFallbackSummary(initialFindPage: CatalogPage): CatalogSummary {
@@ -33,25 +29,20 @@ function buildFallbackSummary(initialFindPage: CatalogPage): CatalogSummary {
 
 async function fetchKitRoomShellData() {
   const initialFindPage = await getInitialFindCatalogPage()
-  const [summaryResult, exploreResult] = await Promise.allSettled([
-    getCatalogSummary(),
-    getExploreKitCatalog(),
-  ])
 
-  const summary =
-    summaryResult.status === "fulfilled"
-      ? summaryResult.value
-      : buildFallbackSummary(initialFindPage)
+  let summary: CatalogSummary
+  let summaryNeedsRefresh = false
 
-  const exploreKits =
-    exploreResult.status === "fulfilled" ? exploreResult.value : initialFindPage.kits
-
-  const summaryNeedsRefresh = summaryResult.status !== "fulfilled"
+  try {
+    summary = await getCatalogSummary()
+  } catch {
+    summary = buildFallbackSummary(initialFindPage)
+    summaryNeedsRefresh = true
+  }
 
   return {
     initialFindPage,
     summary,
-    exploreKits,
     summaryNeedsRefresh,
   }
 }

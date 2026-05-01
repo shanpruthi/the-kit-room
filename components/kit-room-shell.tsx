@@ -14,20 +14,22 @@ import { createPortal } from "react-dom"
 import type { User } from "@supabase/supabase-js"
 import { useHeaderSlot } from "@/components/header-slot"
 import { KIT_ROOM_OPEN_AUTH_EVENT } from "@/components/site-nav"
+import { INITIAL_FIND_CATALOG_LIMIT } from "@/lib/api-catalog-limits"
+import { resolveAllowedImageSrc } from "@/lib/image-proxy-shared"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 import type { CatalogKit, CatalogPage, CatalogSummary, UserKitState } from "@/lib/types"
 
 type KitRoomShellProps = {
   initialFindPage: CatalogPage
   summary: CatalogSummary
-  exploreKits: CatalogKit[]
   summaryNeedsRefresh?: boolean
   initialRoute?: "home" | "about" | "profile"
   profileUserId?: string
 }
 
 const FIND_PAGE_SIZE_DESKTOP = 150
-const FIND_PAGE_SIZE_MOBILE = 20
+const FIND_PAGE_SIZE_MOBILE = 50
+const FIND_INITIAL_BATCH_COUNT = 18
 
 const colorOptions = [
   { name: "Red", hex: "#c53b32" },
@@ -97,13 +99,6 @@ type SavedKitEntry = UserKitState & {
 
 type ProfileTab = "rated" | "owned" | "wanted"
 
-function getImageProxyUrl(url: string | null) {
-  if (!url) {
-    return ""
-  }
-
-  return `/api/image?src=${encodeURIComponent(url)}`
-}
 
 function getUserAvatarUrl(user: User | null) {
   const metadata = user?.user_metadata as Record<string, unknown> | undefined
@@ -187,6 +182,10 @@ function getDecade(year: number | null) {
 
 function formatCount(value: number) {
   return new Intl.NumberFormat("en-US").format(value)
+}
+
+function areAllBatchImagesReady(batchIds: number[], renderedIds: Set<number>) {
+  return batchIds.length === 0 || batchIds.every((id) => renderedIds.has(id))
 }
 
 function getRegion(country: string) {
@@ -520,37 +519,73 @@ function ShirtTile({
   onImageError,
   imageSrc,
   imageLoading = "eager",
+  imageFetchPriority = "auto",
   animateImage = false,
   imageLoaded = true,
   onImageLoad,
+  onImageSettled,
+  size = "default",
 }: {
   kit: CatalogKit
   onImageError: (kitId: number) => void
   imageSrc?: string | null
   imageLoading?: "eager" | "lazy"
+  imageFetchPriority?: "auto" | "high" | "low"
   animateImage?: boolean
   imageLoaded?: boolean
   onImageLoad?: () => void
+  onImageSettled?: () => void
+  size?: "default" | "hero"
 }) {
   const resolvedImageSrc =
     imageSrc === undefined ? getImageProxyUrl(kit.imageUrl) : imageSrc
+  const emptyImageSettledRef = useRef(false)
+
+  useLayoutEffect(() => {
+    emptyImageSettledRef.current = false
+  }, [kit.id])
+
+  useLayoutEffect(() => {
+    if (imageSrc === null) {
+      return
+    }
+
+    if (!kit.imageUrl?.trim()) {
+      if (!emptyImageSettledRef.current) {
+        emptyImageSettledRef.current = true
+        onImageSettled?.()
+      }
+    }
+  }, [imageSrc, kit.imageUrl, kit.id, onImageSettled])
+
+  const tileClass =
+    size === "hero"
+      ? "relative mx-auto flex aspect-[3/4] w-full max-w-[min(92vw,36rem)] items-center justify-center overflow-hidden rounded-[4px] bg-white"
+      : "relative mx-auto flex aspect-[3/4] w-full max-w-[11.4rem] items-center justify-center overflow-hidden rounded-[4px] bg-white"
+
+  const imgMaxClass =
+    size === "hero" ? "max-h-[min(78vh,40rem)] w-full object-contain" : "max-h-[11.8rem] w-full object-contain"
 
   return (
-    <div
-      className="relative mx-auto flex aspect-[3/4] w-full max-w-[11.4rem] items-center justify-center overflow-hidden rounded-[4px] bg-white"
-      style={{ background: "#ffffff" }}
-    >
+    <div className={tileClass} style={{ background: "#ffffff" }}>
       {resolvedImageSrc ? (
         <img
           src={resolvedImageSrc}
           alt={kit.title}
           loading={imageLoading}
+          fetchPriority={imageFetchPriority}
           decoding="async"
-          className={`max-h-[11.8rem] w-full object-contain transition duration-300 ${
+          className={`${imgMaxClass} transition duration-300 ${
             animateImage ? (imageLoaded ? "opacity-100" : "opacity-0") : ""
           }`}
-          onLoad={onImageLoad}
-          onError={() => onImageError(kit.id)}
+          onLoad={() => {
+            onImageLoad?.()
+            onImageSettled?.()
+          }}
+          onError={() => {
+            onImageSettled?.()
+            onImageError(kit.id)
+          }}
         />
       ) : null}
     </div>
@@ -874,35 +909,68 @@ function KitCard({
   )
 }
 
-/** Same motion as Explore: hidden until near/in view, then slide-up + lazy image fade-in. */
 function CatalogKitCard({
   kit,
   onSelect,
   onImageError,
   viewportRoot,
   observeDocumentViewport = false,
+  deferImageUntilVisible = false,
+  deferRootMargin = "320px",
+  deferThreshold = 0.08,
+  holdForBatch = false,
+  batchReady = true,
+  batchRevealAnimation = "none",
+  onImageRendered,
+  imageLoading = "lazy",
+  imageFetchPriority = "auto",
+  showMetadata = true,
+  animateTileImage = true,
+  cardSize = "default",
 }: {
   kit: CatalogKit
   onSelect: (kit: CatalogKit) => void
   onImageError: (kitId: number) => void
-  /** Scroll container for Explore; ignored when `observeDocumentViewport` is true. */
   viewportRoot: HTMLElement | null
-  /** Find uses window scroll; Explore uses `viewportRoot` once the pane ref is ready. */
   observeDocumentViewport?: boolean
+  deferImageUntilVisible?: boolean
+  deferRootMargin?: string
+  deferThreshold?: number
+  holdForBatch?: boolean
+  batchReady?: boolean
+  batchRevealAnimation?: "none" | "slide-up"
+  onImageRendered?: (kitId: number) => void
+  imageLoading?: "eager" | "lazy"
+  imageFetchPriority?: "auto" | "high" | "low"
+  showMetadata?: boolean
+  animateTileImage?: boolean
+  cardSize?: "default" | "hero"
 }) {
   const cardRef = useRef<HTMLButtonElement>(null)
-  const [hasEnteredView, setHasEnteredView] = useState(false)
-  const [shouldLoadImage, setShouldLoadImage] = useState(false)
+  const [shouldLoadImage, setShouldLoadImage] = useState(!deferImageUntilVisible)
   const [imageLoaded, setImageLoaded] = useState(false)
+  const hideUntilBatchReady = holdForBatch && !batchReady
+  const showBatchRevealAnimation =
+    holdForBatch && batchReady && batchRevealAnimation === "slide-up"
+
+  const effectiveImageLoading: "eager" | "lazy" =
+    deferImageUntilVisible && shouldLoadImage ? "eager" : imageLoading
 
   useEffect(() => {
+    if (!deferImageUntilVisible) {
+      setShouldLoadImage(true)
+      return
+    }
+
     const node = cardRef.current
 
     if (!node) {
       return
     }
 
-    if (!observeDocumentViewport && !viewportRoot) {
+    const root = observeDocumentViewport ? null : viewportRoot
+
+    if (!observeDocumentViewport && !root) {
       return
     }
 
@@ -914,25 +982,37 @@ function CatalogKitCard({
           return
         }
 
-        setHasEnteredView(true)
         setShouldLoadImage(true)
+        observer.disconnect()
       },
       {
-        root: observeDocumentViewport ? null : viewportRoot,
-        rootMargin: "320px",
-        threshold: 0.08,
+        root,
+        rootMargin: deferRootMargin,
+        threshold: deferThreshold,
       },
     )
 
     observer.observe(node)
 
     return () => observer.disconnect()
-  }, [observeDocumentViewport, viewportRoot])
+  }, [
+    deferImageUntilVisible,
+    deferRootMargin,
+    deferThreshold,
+    observeDocumentViewport,
+    viewportRoot,
+  ])
 
   return (
     <button
       ref={cardRef}
-      className={`group text-center ${hasEnteredView ? "slide-up" : "opacity-0"}`}
+      className={`group text-center ${
+        hideUntilBatchReady
+          ? "pointer-events-none opacity-0"
+          : showBatchRevealAnimation
+            ? "slide-up"
+            : ""
+      } w-full`}
       onClick={() => onSelect(kit)}
       type="button"
     >
@@ -940,20 +1020,43 @@ function CatalogKitCard({
         <ShirtTile
           kit={kit}
           onImageError={onImageError}
-          imageSrc={shouldLoadImage ? getImageProxyUrl(kit.imageUrl) : null}
-          imageLoading="lazy"
-          animateImage
+          imageSrc={shouldLoadImage ? undefined : null}
+          imageLoading={effectiveImageLoading}
+          imageFetchPriority={imageFetchPriority}
+          animateImage={animateTileImage && !holdForBatch}
           imageLoaded={imageLoaded}
           onImageLoad={() => setImageLoaded(true)}
+          onImageSettled={() => onImageRendered?.(kit.id)}
+          size={cardSize === "hero" ? "hero" : "default"}
         />
-        <div className="mx-auto mt-3 max-w-[11.4rem] space-y-0.5">
-          <h3 className="text-[11px] font-normal tracking-[-0.01em] text-[#222]">
-            {kit.teamName}
-          </h3>
-          <p className="text-[10px] text-[#a0a0a0]">
-            {kit.seasonLabel} · {kit.brandName}
-          </p>
-        </div>
+        {showMetadata && (!deferImageUntilVisible || shouldLoadImage) ? (
+          <div
+            className={
+              cardSize === "hero"
+                ? "mx-auto mt-5 max-w-[min(92vw,36rem)] space-y-1 px-1"
+                : "mx-auto mt-3 max-w-[11.4rem] space-y-0.5"
+            }
+          >
+            <h3
+              className={
+                cardSize === "hero"
+                  ? "text-[17px] font-normal tracking-[-0.02em] text-[#111] sm:text-[18px]"
+                  : "text-[11px] font-normal tracking-[-0.01em] text-[#222]"
+              }
+            >
+              {kit.teamName}
+            </h3>
+            <p
+              className={
+                cardSize === "hero"
+                  ? "text-[14px] text-[#888] sm:text-[15px]"
+                  : "text-[10px] text-[#a0a0a0]"
+              }
+            >
+              {kit.seasonLabel} · {kit.brandName}
+            </p>
+          </div>
+        ) : null}
       </article>
     </button>
   )
@@ -985,13 +1088,23 @@ const KitGrid = memo(function KitGrid({
   kits,
   onSelect,
   onImageError,
+  initialBatchIds,
+  initialBatchReady,
+  onImageRendered,
+  gridTopSpacingClass = "mt-10",
 }: {
   kits: CatalogKit[]
   onSelect: (kit: CatalogKit) => void
   onImageError: (kitId: number) => void
+  initialBatchIds: Set<number>
+  initialBatchReady: boolean
+  onImageRendered: (kitId: number) => void
+  gridTopSpacingClass?: string
 }) {
   return (
-    <div className="mx-auto mt-10 grid max-w-7xl grid-cols-2 gap-x-2 gap-y-7 min-[380px]:grid-cols-3 min-[380px]:gap-x-3 sm:gap-x-5 sm:gap-y-10 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+    <div
+      className={`mx-auto grid max-w-7xl grid-cols-2 gap-x-2 gap-y-7 min-[380px]:grid-cols-3 min-[380px]:gap-x-3 sm:gap-x-5 sm:gap-y-10 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 ${gridTopSpacingClass}`}
+    >
       {kits.map((kit) => (
         <div key={kit.id} className="min-w-0">
           <CatalogKitCard
@@ -1000,6 +1113,12 @@ const KitGrid = memo(function KitGrid({
             onImageError={onImageError}
             viewportRoot={null}
             observeDocumentViewport
+            holdForBatch={initialBatchIds.has(kit.id)}
+            batchReady={initialBatchReady}
+            batchRevealAnimation="slide-up"
+            onImageRendered={onImageRendered}
+            imageLoading={initialBatchIds.has(kit.id) ? "eager" : "lazy"}
+            imageFetchPriority={initialBatchIds.has(kit.id) ? "high" : "auto"}
           />
         </div>
       ))}
@@ -1047,7 +1166,6 @@ function ProfileSection({
 export function KitRoomShell({
   initialFindPage,
   summary,
-  exploreKits,
   summaryNeedsRefresh = false,
   initialRoute = "home",
   profileUserId,
@@ -1067,17 +1185,18 @@ export function KitRoomShell({
   const [findLoading, setFindLoading] = useState(false)
   const [findLoadingMore, setFindLoadingMore] = useState(false)
   const [findError, setFindError] = useState<string | null>(null)
+  const [findBatchRevealForced, setFindBatchRevealForced] = useState(false)
   const [selectedKit, setSelectedKit] = useState<CatalogKit | null>(null)
   const [showAbout] = useState(initialRoute === "about")
   const [showProfile] = useState(initialRoute === "profile")
   const [profileTab, setProfileTab] = useState<ProfileTab>("rated")
-  const [viewMode, setViewMode] = useState<"find" | "explore">("find")
   const [findPageSize, setFindPageSize] = useState(FIND_PAGE_SIZE_MOBILE)
   const findPageSizeRef = useRef(FIND_PAGE_SIZE_MOBILE)
   findPageSizeRef.current = findPageSize
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [authResolved, setAuthResolved] = useState(false)
   const [brokenImageIds, setBrokenImageIds] = useState<number[]>([])
+  const [renderedImageIds, setRenderedImageIds] = useState<number[]>([])
   const [savedKitEntries, setSavedKitEntries] = useState<SavedKitEntry[]>([])
   const [savedKitEntriesLoading, setSavedKitEntriesLoading] = useState(false)
   const [profileKits, setProfileKits] = useState<CatalogKit[]>([])
@@ -1095,20 +1214,9 @@ export function KitRoomShell({
   const [kitStateNotice, setKitStateNotice] = useState<string | null>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const findLoadMoreRef = useRef<HTMLDivElement>(null)
-  const exploreViewportRef = useRef<HTMLElement>(null)
-  const [exploreViewportNode, setExploreViewportNode] = useState<HTMLElement | null>(null)
-  const exploreEdgeScrollRef = useRef({ dx: 0, dy: 0 })
-  const exploreEdgeFrameRef = useRef<number | null>(null)
   const findRequestIdRef = useRef(0)
-  const lastLoadedFindQueryKeyRef = useRef(
-    buildFindQueryKey({
-      search: "",
-      decades: [],
-      brands: [],
-      kitTypes: [],
-      colors: [],
-    }),
-  )
+  /** `null` forces a client fetch on first mount even when the key matches empty-filter SSR. */
+  const lastLoadedFindQueryKeyRef = useRef<string | null>(null)
 
   const { setLeft } = useHeaderSlot()
 
@@ -1117,9 +1225,6 @@ export function KitRoomShell({
 
     function syncViewport() {
       const wide = media.matches
-      if (!wide) {
-        setViewMode("find")
-      }
       setFindPageSize(wide ? FIND_PAGE_SIZE_DESKTOP : FIND_PAGE_SIZE_MOBILE)
     }
 
@@ -1445,106 +1550,6 @@ export function KitRoomShell({
   }, [profileViewEntries])
 
   useEffect(() => {
-    const canvas = exploreViewportRef.current
-
-    if (!canvas || viewMode !== "explore") {
-      return
-    }
-
-    const centerCanvas = () => {
-      canvas.scrollLeft = (canvas.scrollWidth - canvas.clientWidth) / 2
-      canvas.scrollTop = (canvas.scrollHeight - canvas.clientHeight) / 2
-    }
-
-    const frameOne = window.requestAnimationFrame(centerCanvas)
-    const frameTwo = window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(centerCanvas)
-    })
-
-    return () => {
-      window.cancelAnimationFrame(frameOne)
-      window.cancelAnimationFrame(frameTwo)
-    }
-  }, [viewMode])
-
-  useEffect(() => {
-    const viewport = exploreViewportRef.current
-
-    if (!viewport || viewMode !== "explore") {
-      return
-    }
-
-    const stopScrolling = () => {
-      exploreEdgeScrollRef.current = { dx: 0, dy: 0 }
-
-      if (exploreEdgeFrameRef.current !== null) {
-        window.cancelAnimationFrame(exploreEdgeFrameRef.current)
-        exploreEdgeFrameRef.current = null
-      }
-    }
-
-    const step = () => {
-      const { dx, dy } = exploreEdgeScrollRef.current
-
-      if (dx === 0 && dy === 0) {
-        exploreEdgeFrameRef.current = null
-        return
-      }
-
-      viewport.scrollLeft += dx
-      viewport.scrollTop += dy
-      exploreEdgeFrameRef.current = window.requestAnimationFrame(step)
-    }
-
-    const startScrollingIfNeeded = () => {
-      if (exploreEdgeFrameRef.current === null) {
-        exploreEdgeFrameRef.current = window.requestAnimationFrame(step)
-      }
-    }
-
-    const handlePointerMove = (event: MouseEvent) => {
-      const rect = viewport.getBoundingClientRect()
-      const edgeSize = 96
-      const maxSpeed = 18
-
-      const localX = event.clientX - rect.left
-      const localY = event.clientY - rect.top
-
-      let dx = 0
-      let dy = 0
-
-      if (localX >= 0 && localX <= edgeSize) {
-        dx = -maxSpeed * (1 - localX / edgeSize)
-      } else if (localX <= rect.width && localX >= rect.width - edgeSize) {
-        dx = maxSpeed * (1 - (rect.width - localX) / edgeSize)
-      }
-
-      if (localY >= 0 && localY <= edgeSize) {
-        dy = -maxSpeed * (1 - localY / edgeSize)
-      } else if (localY <= rect.height && localY >= rect.height - edgeSize) {
-        dy = maxSpeed * (1 - (rect.height - localY) / edgeSize)
-      }
-
-      exploreEdgeScrollRef.current = { dx, dy }
-
-      if (dx !== 0 || dy !== 0) {
-        startScrollingIfNeeded()
-      } else {
-        stopScrolling()
-      }
-    }
-
-    viewport.addEventListener("mousemove", handlePointerMove)
-    viewport.addEventListener("mouseleave", stopScrolling)
-
-    return () => {
-      viewport.removeEventListener("mousemove", handlePointerMove)
-      viewport.removeEventListener("mouseleave", stopScrolling)
-      stopScrolling()
-    }
-  }, [viewMode])
-
-  useEffect(() => {
     if (!selectedKit) {
       setUserKitState(emptyUserKitState)
       setUserKitStateLoading(false)
@@ -1648,7 +1653,10 @@ export function KitRoomShell({
       params.set("q", debouncedSearch)
     }
 
-    params.set("limit", String(findPageSizeRef.current))
+    params.set(
+      "limit",
+      String(append ? findPageSizeRef.current : INITIAL_FIND_CATALOG_LIMIT),
+    )
     params.set("offset", String(offset))
 
     activeDecades.forEach((decade) => params.append("decade", decade))
@@ -1701,8 +1709,6 @@ export function KitRoomShell({
         error instanceof Error ? error.message : "Failed to load catalog results.",
       )
       if (!append) {
-        setFindKits([])
-        setFindTotalCount(0)
         setFindHasMore(false)
       }
     } finally {
@@ -1724,6 +1730,12 @@ export function KitRoomShell({
       }),
     [activeBrands, activeColors, activeDecades, activeKitTypes, debouncedSearch],
   )
+
+  useEffect(() => {
+    setFindBatchRevealForced(false)
+    const timerId = window.setTimeout(() => setFindBatchRevealForced(true), 12_000)
+    return () => window.clearTimeout(timerId)
+  }, [currentFindQueryKey])
 
   useEffect(() => {
     if (currentFindQueryKey === lastLoadedFindQueryKeyRef.current) {
@@ -1749,7 +1761,7 @@ export function KitRoomShell({
   useEffect(() => {
     const node = findLoadMoreRef.current
 
-    if (!node || !findHasMore || findLoading || findLoadingMore || viewMode !== "find") {
+    if (!node || !findHasMore || findLoading || findLoadingMore) {
       return
     }
 
@@ -1776,24 +1788,35 @@ export function KitRoomShell({
     findLoading,
     findLoadingMore,
     findPageSize,
-    viewMode,
   ])
 
   const kitsById = useMemo(() => {
     const merged = new Map<number, CatalogKit>()
 
-    ;[...findKits, ...exploreKits, ...profileKits].forEach((kit) => {
+    ;[...findKits, ...profileKits].forEach((kit) => {
       merged.set(kit.id, kit)
     })
 
     return merged
-  }, [exploreKits, findKits, profileKits])
+  }, [findKits, profileKits])
   const visibleFindKits = useMemo(() => {
     return findKits.filter((kit) => !brokenImageIds.includes(kit.id))
   }, [brokenImageIds, findKits])
-  const visibleExploreKits = useMemo(() => {
-    return exploreKits.filter((kit) => !brokenImageIds.includes(kit.id))
-  }, [brokenImageIds, exploreKits])
+  const renderedImageIdSet = useMemo(() => new Set(renderedImageIds), [renderedImageIds])
+  const initialFindBatchIds = useMemo(
+    () => visibleFindKits.slice(0, FIND_INITIAL_BATCH_COUNT).map((kit) => kit.id),
+    [visibleFindKits],
+  )
+  const initialFindBatchIdSet = useMemo(
+    () => new Set(initialFindBatchIds),
+    [initialFindBatchIds],
+  )
+  const initialFindBatchReady = useMemo(
+    () =>
+      findBatchRevealForced ||
+      areAllBatchImagesReady(initialFindBatchIds, renderedImageIdSet),
+    [findBatchRevealForced, initialFindBatchIds, renderedImageIdSet],
+  )
   const currentUserAvatarUrl = useMemo(() => getUserAvatarUrl(currentUser), [currentUser])
   const currentUserDisplayName = useMemo(
     () => getUserDisplayName(currentUser),
@@ -1881,7 +1904,16 @@ export function KitRoomShell({
     setBrokenImageIds((current) =>
       current.includes(kitId) ? current : [...current, kitId],
     )
+    setRenderedImageIds((current) =>
+      current.includes(kitId) ? current : [...current, kitId],
+    )
   }
+
+  const handleImageRendered = useCallback((kitId: number) => {
+    setRenderedImageIds((current) =>
+      current.includes(kitId) ? current : [...current, kitId],
+    )
+  }, [])
 
   const handleSignOut = useCallback(async () => {
     await browserSupabase.auth.signOut()
@@ -2019,69 +2051,9 @@ export function KitRoomShell({
       return () => setLeft(null)
     }
 
-    setLeft(
-      <>
-        <div className="inline-flex min-w-0 max-w-full shrink items-center overflow-hidden rounded-full border border-[var(--line)] bg-[#fafafa] p-0.5 text-[12px] leading-none md:hidden">
-          <button
-            type="button"
-            onClick={() => setViewMode("find")}
-            className={`shrink-0 rounded-full px-2.5 py-1.5 transition ${
-              viewMode === "find"
-                ? "bg-[#111] text-white"
-                : "text-[var(--muted)]"
-            }`}
-          >
-            Find
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("explore")}
-            className={`shrink-0 rounded-full px-2.5 py-1.5 transition ${
-              viewMode === "explore"
-                ? "bg-[#111] text-white"
-                : "text-[var(--muted)]"
-            }`}
-          >
-            Explore
-          </button>
-        </div>
-        <div className="hidden items-center rounded-full border border-[var(--line)] bg-[#fafafa] p-1 text-[13px] md:inline-flex">
-          <button
-            type="button"
-            onClick={() => setViewMode("find")}
-            className={`rounded-full px-3 py-1 transition ${
-              viewMode === "find"
-                ? "bg-[#111] text-white"
-                : "text-[var(--muted)]"
-            }`}
-          >
-            Find
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("explore")}
-            className={`rounded-full px-3 py-1 transition ${
-              viewMode === "explore"
-                ? "bg-[#111] text-white"
-                : "text-[var(--muted)]"
-            }`}
-          >
-            Explore
-          </button>
-        </div>
-      </>,
-    )
+    setLeft(null)
     return () => setLeft(null)
-  }, [
-    showAbout,
-    showProfile,
-    authResolved,
-    currentUser,
-    profileUserId,
-    viewMode,
-    setLeft,
-    setViewMode,
-  ])
+  }, [showAbout, showProfile, authResolved, currentUser, profileUserId, setLeft])
 
   if (showAbout) {
     return (
@@ -2283,15 +2255,8 @@ export function KitRoomShell({
   }
 
   return (
-    <main
-      className={
-        viewMode === "find"
-          ? "min-h-screen bg-white pb-20"
-          : "min-h-screen bg-white"
-      }
-    >
-      {viewMode === "find" ? (
-        <section className="mx-auto max-w-6xl px-4 pb-16 pt-2 sm:px-6 sm:pt-8 md:pt-16 lg:px-8">
+    <main className="min-h-screen bg-white pb-20">
+      <section className="mx-auto max-w-6xl px-4 pb-16 pt-2 sm:px-6 sm:pt-8 md:pt-16 lg:px-8">
           <div className="fade-in flex flex-col">
             <div className="slide-up order-1 w-full md:order-2 md:mt-8">
               <div className="mx-auto flex justify-center">
@@ -2417,9 +2382,16 @@ export function KitRoomShell({
           </div>
 
           {findError ? (
-            <p className="mx-auto mt-12 max-w-3xl text-center text-[14px] text-[#9a9a9a]">
-              {findError}
-            </p>
+            <div className="mx-auto mt-12 flex max-w-3xl flex-col items-center gap-3 text-center">
+              <p className="text-[14px] text-[#9a9a9a]">{findError}</p>
+              <button
+                type="button"
+                className="text-[13px] font-medium text-[#1d1d1d] underline underline-offset-2"
+                onClick={() => void loadFindPage({ offset: 0, append: false })}
+              >
+                Try again
+              </button>
+            </div>
           ) : null}
 
           {findLoading && visibleFindKits.length === 0 ? (
@@ -2430,6 +2402,9 @@ export function KitRoomShell({
                 kits={visibleFindKits}
                 onSelect={setSelectedKit}
                 onImageError={handleBrokenImage}
+                initialBatchIds={initialFindBatchIdSet}
+                initialBatchReady={initialFindBatchReady}
+                onImageRendered={handleImageRendered}
               />
 
               {!findLoadingMore && visibleFindKits.length === 0 ? (
@@ -2447,35 +2422,7 @@ export function KitRoomShell({
               ) : null}
             </>
           )}
-        </section>
-      ) : (
-        <section
-          ref={(node) => {
-            exploreViewportRef.current = node
-            setExploreViewportNode(node)
-          }}
-          className="h-[calc(100vh-3.5rem)] overflow-auto bg-white hide-scrollbar"
-        >
-          <div className="w-max px-12 py-12">
-            <div
-              className="grid w-max auto-rows-max gap-x-10 gap-y-12"
-              style={{
-                gridTemplateColumns: "repeat(31, 11.4rem)",
-              }}
-            >
-              {visibleExploreKits.map((kit) => (
-                <CatalogKitCard
-                  key={kit.id}
-                  kit={kit}
-                  onSelect={setSelectedKit}
-                  onImageError={handleBrokenImage}
-                  viewportRoot={exploreViewportNode}
-                />
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
+      </section>
 
       <KitModal
         kit={selectedKit}

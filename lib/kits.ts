@@ -1,3 +1,4 @@
+import { INITIAL_FIND_CATALOG_LIMIT } from "@/lib/api-catalog-limits"
 import { supabase } from "@/lib/supabase"
 import type { CatalogKit, CatalogPage, CatalogSummary, CatalogSearchParams } from "@/lib/types"
 
@@ -127,6 +128,24 @@ const colorFallbacks: Record<string, string> = {
   grey: "#8d8a84",
 }
 
+function firstNonEmptyUrl(
+  ...candidates: (string | null | undefined)[]
+): string | null {
+  for (const candidate of candidates) {
+    if (typeof candidate !== "string") {
+      continue
+    }
+
+    const trimmed = candidate.trim()
+
+    if (trimmed.length > 0) {
+      return trimmed
+    }
+  }
+
+  return null
+}
+
 function normalizeHex(name: string | null, hex: string | null) {
   if (hex) {
     return hex
@@ -187,6 +206,16 @@ function mapCatalogKit(kit: RawKitRow): CatalogKit {
     (left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0),
   )
 
+  let galleryUrl: string | null = null
+
+  for (const image of orderedImages) {
+    galleryUrl = firstNonEmptyUrl(image.object_url, image.source_url)
+
+    if (galleryUrl) {
+      break
+    }
+  }
+
   return {
     id: kit.id,
     title: kit.title,
@@ -203,12 +232,11 @@ function mapCatalogKit(kit: RawKitRow): CatalogKit {
     description: kit.description,
     ratingAverage: Number(kit.community_rating_avg ?? 0),
     ratingCount: kit.community_rating_count ?? 0,
-    imageUrl:
-      kit.primary_object_url ??
-      kit.primary_image_url ??
-      orderedImages[0]?.object_url ??
-      orderedImages[0]?.source_url ??
-      null,
+    imageUrl: firstNonEmptyUrl(
+      kit.primary_object_url,
+      kit.primary_image_url,
+      galleryUrl,
+    ),
     sourceUrl: kit.source_url,
     colors: orderedColors.map((color) => ({
       name: color.color_name ?? "Unknown",
@@ -350,26 +378,8 @@ export async function getInitialFindCatalogPage(): Promise<CatalogPage> {
     brands: [],
     kitTypes: [],
     colors: [],
-    limit: 20,
+    limit: INITIAL_FIND_CATALOG_LIMIT,
     offset: 0,
     sortByMemberRating: true,
   })
-}
-
-export async function getExploreKitCatalog(): Promise<CatalogKit[]> {
-  const { data, error } = await supabase
-    .from("kits")
-    .select(KIT_SELECT)
-    .order("community_rating_avg", { ascending: false, nullsFirst: false })
-    .limit(1500)
-    .returns<RawKitRow[]>()
-
-  if (error) {
-    throw new Error(`Failed to load explore kits: ${error.message}`)
-  }
-
-  return (data ?? [])
-    .map(mapCatalogKit)
-    .filter(hasCatalogImage)
-    .slice(0, 1500)
 }

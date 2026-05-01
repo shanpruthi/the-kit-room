@@ -30,7 +30,6 @@ export default async function ProfilePage({
     <KitRoomShell
       initialFindPage={EMPTY_FIND_PAGE}
       summary={EMPTY_SUMMARY}
-      exploreKits={[]}
       initialRoute="profile"
       profileUserId={userId}
     />

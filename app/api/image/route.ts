@@ -1,28 +1,5 @@
 import { NextResponse } from "next/server"
-
-const BASE_ALLOWED_HOSTS = new Set([
-  "cdn.footballkitarchive.com",
-  "footballkitarchive.com",
-  "www.footballkitarchive.com",
-  "lh3.googleusercontent.com",
-  "googleusercontent.com",
-  "supabase.co",
-])
-
-function getAllowedHosts() {
-  const hosts = new Set(BASE_ALLOWED_HOSTS)
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-
-  if (supabaseUrl) {
-    try {
-      hosts.add(new URL(supabaseUrl).hostname.toLowerCase())
-    } catch {
-      // Ignore invalid env values and fall back to the base allowlist.
-    }
-  }
-
-  return hosts
-}
+import { isHostnameAllowedForImageProxy } from "@/lib/image-proxy-shared"
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -45,17 +22,13 @@ export async function GET(request: Request) {
   }
 
   const hostname = parsed.hostname.toLowerCase()
-  const allowedHosts = getAllowedHosts()
-  const allowed = [...allowedHosts].some(
-    (host) => hostname === host || hostname.endsWith(`.${host}`),
-  )
 
-  if (!allowed) {
+  if (!isHostnameAllowedForImageProxy(hostname)) {
     return new NextResponse("Host not allowed", { status: 403 })
   }
 
   const upstream = await fetch(parsed.toString(), {
-    cache: "no-store",
+    next: { revalidate: 86_400 },
     headers: {
       "User-Agent": "The Kit Room Image Proxy",
     },
@@ -67,13 +40,25 @@ export async function GET(request: Request) {
 
   const contentType =
     upstream.headers.get("content-type") ?? "application/octet-stream"
+  const cacheControl = "public, max-age=86400, stale-while-revalidate=604800"
+
+  if (upstream.body) {
+    return new NextResponse(upstream.body, {
+      status: 200,
+      headers: {
+        "Content-Type": contentType,
+        "Cache-Control": cacheControl,
+      },
+    })
+  }
+
   const arrayBuffer = await upstream.arrayBuffer()
 
   return new NextResponse(arrayBuffer, {
     status: 200,
     headers: {
       "Content-Type": contentType,
-      "Cache-Control": "no-store, max-age=0",
+      "Cache-Control": cacheControl,
     },
   })
 }

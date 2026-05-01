@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Profile header — Sign out layout (mock)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400&display=swap"
+    />
+    <style>
+      :root {
+        --line: #e8e8e8;
+        --muted: #9a9a9a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: "Manrope", system-ui, sans-serif;
+        background: #fff;
+        color: #111;
+      }
+      .app-header {
+        position: sticky;
+        top: 0;
+        z-index: 40;
+        display: flex;
+        height: 3.5rem;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.95);
+        padding: 0 1rem;
+        font-size: 12px;
+      }
+      .main {
+        max-width: 72rem;
+        margin: 0 auto;
+        padding: 4rem 1rem 4rem;
+      }
+      .profile-grid {
+        display: grid;
+        grid-template-columns: 44px minmax(0, 1fr);
+        column-gap: 1rem;
+        row-gap: 0.625rem;
+        align-items: start;
+        width: 100%;
+      }
+      .avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: #e6e6e6;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        text-transform: uppercase;
+        color: #777;
+      }
+      h1 {
+        margin: 0;
+        font-size: 1.875rem;
+        line-height: 1.1;
+        font-weight: 300;
+        letter-spacing: -0.04em;
+      }
+      .stats {
+        margin: 0.25rem 0 0;
+        font-size: 14px;
+        color: #888;
+        line-height: 1.4;
+      }
+      .spacer-col {
+        width: 2.75rem; /* w-11 — aligns second row with avatar column */
+        min-height: 0;
+      }
+      .btn-signout {
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 4px;
+        padding: 0.125rem 0.5rem;
+        font: inherit;
+        font-size: 11px;
+        line-height: 1;
+        color: #666;
+        cursor: default;
+      }
+      .note {
+        margin-top: 2.5rem;
+        padding: 1rem 1.25rem;
+        background: #fafafa;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #666;
+        max-width: 28rem;
+      }
+      .tabs {
+        display: inline-flex;
+        border: 1px solid var(--line);
+        background: #fafafa;
+        border-radius: 9999px;
+        padding: 4px;
+        font-size: 13px;
+        margin-top: 2.5rem;
+      }
+      .tab {
+        border-radius: 9999px;
+        padding: 0.25rem 0.75rem;
+        background: #111;
+        color: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="app-header">
+      <span>Profile</span>
+      <span style="color: #ccc">≡</span>
+    </header>
+    <main class="main">
+      <p style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin: 0 0 0.5rem">Static mock — latest layout</p>
+
+      <div class="profile-grid" aria-label="Profile header mock">
+        <div class="avatar" aria-hidden>S</div>
+        <div>
+          <h1>Shan Pruthi</h1>
+          <p class="stats">23 rated · 3 owned · 5 want</p>
+        </div>
+        <div class="spacer-col" aria-hidden></div>
+        <div>
+          <span class="btn-signout">Sign out</span>
+        </div>
+      </div>
+
+      <div class="tabs" aria-hidden>
+        <span class="tab">Rated</span>
+        <span style="padding: 0.25rem 0.75rem; color: var(--muted)">Own</span>
+        <span style="padding: 0.25rem 0.75rem; color: var(--muted)">Want</span>
+      </div>
+      <p style="margin-top: 1.5rem; font-size: 18px; color: #111; font-weight: 400; letter-spacing: -0.02em">Rated</p>
+
+      <p class="note">
+        <strong>What you’re looking at</strong> — <strong>Sign out</strong> is on
+        a second row, aligned with the name/stats (not with the right edge of the
+        screen on desktop, and not beside the name block on one row). The empty
+        cell under the avatar matches the 44px column so the button lines up with
+        “Shan Pruthi” and the stats line. Open the real app at
+        <code>/profile/…</code> when signed in to compare.
+      </p>
+    </main>
+  </body>
+</html>
