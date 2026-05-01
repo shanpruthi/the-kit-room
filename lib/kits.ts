@@ -1,4 +1,3 @@
-import { INITIAL_FIND_CATALOG_LIMIT } from "@/lib/api-catalog-limits"
 import { supabase } from "@/lib/supabase"
 import type { CatalogKit, CatalogPage, CatalogSummary, CatalogSearchParams } from "@/lib/types"
 
@@ -128,24 +127,6 @@ const colorFallbacks: Record<string, string> = {
   grey: "#8d8a84",
 }
 
-function firstNonEmptyUrl(
-  ...candidates: (string | null | undefined)[]
-): string | null {
-  for (const candidate of candidates) {
-    if (typeof candidate !== "string") {
-      continue
-    }
-
-    const trimmed = candidate.trim()
-
-    if (trimmed.length > 0) {
-      return trimmed
-    }
-  }
-
-  return null
-}
-
 function normalizeHex(name: string | null, hex: string | null) {
   if (hex) {
     return hex
@@ -185,6 +166,74 @@ function firstCompetitionName(
   return competition.name
 }
 
+/** Explore mosaic: max kits returned after shuffle (fetch pulls a few extra for URL validation fallout). */
+const EXPLORE_CATALOG_LIMIT = 2000
+const EXPLORE_CATALOG_FETCH_CAP = EXPLORE_CATALOG_LIMIT + 400
+
+function shuffleArrayInPlace<T>(items: T[]): void {
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    const tmp = items[i]!
+    items[i] = items[j]!
+    items[j] = tmp
+  }
+}
+
+function exploreRowHasPrimaryImage(row: RawKitRow): boolean {
+  const objectUrl = row.primary_object_url?.trim()
+  const imageUrl = row.primary_image_url?.trim()
+
+  return Boolean(objectUrl) || Boolean(imageUrl)
+}
+
+function normalizeCatalogImageUrl(candidate: string | null | undefined): string | null {
+  if (typeof candidate !== "string") {
+    return null
+  }
+
+  const trimmed = candidate.trim()
+
+  if (!trimmed) {
+    return null
+  }
+
+  try {
+    const parsed = new URL(trimmed)
+
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null
+    }
+
+    return parsed.href
+  } catch {
+    return null
+  }
+}
+
+function pickCatalogImageUrl(
+  kit: RawKitRow,
+  orderedImages: RawKitRow["kit_images"],
+): string | null {
+  const candidates: (string | null | undefined)[] = [
+    kit.primary_object_url,
+    kit.primary_image_url,
+  ]
+
+  for (const row of orderedImages ?? []) {
+    candidates.push(row.object_url, row.source_url)
+  }
+
+  for (const candidate of candidates) {
+    const normalized = normalizeCatalogImageUrl(candidate)
+
+    if (normalized) {
+      return normalized
+    }
+  }
+
+  return null
+}
+
 function mapCatalogKit(kit: RawKitRow): CatalogKit {
   const orderedColors = [...(kit.kit_colors ?? [])].sort(
     (left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0),
@@ -206,16 +255,6 @@ function mapCatalogKit(kit: RawKitRow): CatalogKit {
     (left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0),
   )
 
-  let galleryUrl: string | null = null
-
-  for (const image of orderedImages) {
-    galleryUrl = firstNonEmptyUrl(image.object_url, image.source_url)
-
-    if (galleryUrl) {
-      break
-    }
-  }
-
   return {
     id: kit.id,
     title: kit.title,
@@ -232,11 +271,7 @@ function mapCatalogKit(kit: RawKitRow): CatalogKit {
     description: kit.description,
     ratingAverage: Number(kit.community_rating_avg ?? 0),
     ratingCount: kit.community_rating_count ?? 0,
-    imageUrl: firstNonEmptyUrl(
-      kit.primary_object_url,
-      kit.primary_image_url,
-      galleryUrl,
-    ),
+    imageUrl: pickCatalogImageUrl(kit, orderedImages),
     sourceUrl: kit.source_url,
     colors: orderedColors.map((color) => ({
       name: color.color_name ?? "Unknown",
@@ -252,7 +287,7 @@ function mapCatalogKit(kit: RawKitRow): CatalogKit {
 }
 
 function hasCatalogImage(kit: CatalogKit) {
-  return Boolean(kit.imageUrl)
+  return typeof kit.imageUrl === "string" && kit.imageUrl.trim().length > 0
 }
 
 export async function getKitsByIds(ids: number[]): Promise<CatalogKit[]> {
@@ -378,8 +413,27 @@ export async function getInitialFindCatalogPage(): Promise<CatalogPage> {
     brands: [],
     kitTypes: [],
     colors: [],
-    limit: INITIAL_FIND_CATALOG_LIMIT,
+    limit: 20,
     offset: 0,
     sortByMemberRating: true,
   })
+}
+
+export async function getExploreKitCatalog(): Promise<CatalogKit[]> {
+  const { data, error } = await supabase
+    .from("kits")
+    .select(KIT_SELECT)
+    .or("primary_object_url.not.is.null,primary_image_url.not.is.null")
+    .limit(EXPLORE_CATALOG_FETCH_CAP)
+    .returns<RawKitRow[]>()
+
+  if (error) {
+    throw new Error(`Failed to load explore kits: ${error.message}`)
+  }
+
+  const rows = (data ?? []).filter(exploreRowHasPrimaryImage)
+  const kits = rows.map(mapCatalogKit).filter(hasCatalogImage)
+  shuffleArrayInPlace(kits)
+
+  return kits.slice(0, EXPLORE_CATALOG_LIMIT)
 }
