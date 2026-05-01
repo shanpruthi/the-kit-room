@@ -21,7 +21,7 @@ import type { CatalogKit, CatalogPage, CatalogSummary, UserKitState } from "@/li
 type KitRoomShellProps = {
   initialFindPage: CatalogPage
   summary: CatalogSummary
-  exploreKits: CatalogKit[]
+  exploreKits?: CatalogKit[]
   summaryNeedsRefresh?: boolean
   initialRoute?: "home" | "about" | "profile"
   profileUserId?: string
@@ -1127,7 +1127,7 @@ function ProfileSection({
 export function KitRoomShell({
   initialFindPage,
   summary,
-  exploreKits,
+  exploreKits = [],
   summaryNeedsRefresh = false,
   initialRoute = "home",
   profileUserId,
