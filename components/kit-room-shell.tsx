@@ -15,7 +15,7 @@ import type { User } from "@supabase/supabase-js"
 import { useHeaderSlot } from "@/components/header-slot"
 import { KIT_ROOM_OPEN_AUTH_EVENT } from "@/components/site-nav"
 import { INITIAL_FIND_CATALOG_LIMIT } from "@/lib/api-catalog-limits"
-import { resolveAllowedImageSrc, resolveCatalogImageSrc } from "@/lib/image-proxy-shared"
+import { getImageProxyUrl, resolveAllowedImageSrc } from "@/lib/image-proxy-shared"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 import type { CatalogKit, CatalogPage, CatalogSummary, UserKitState } from "@/lib/types"
 
@@ -538,7 +538,7 @@ function ShirtTile({
   size?: "default" | "hero"
 }) {
   const resolvedImageSrc =
-    imageSrc === undefined ? resolveCatalogImageSrc(kit.imageUrl) : imageSrc
+    imageSrc === undefined ? getImageProxyUrl(kit.imageUrl) : imageSrc
   const emptyImageSettledRef = useRef(false)
 
   useLayoutEffect(() => {
@@ -661,7 +661,7 @@ function KitModal({
           <div className="flex items-center justify-center overflow-hidden rounded-[8px] border border-[var(--line)] bg-white">
             {imageUrl ? (
               <img
-                src={resolveCatalogImageSrc(imageUrl)}
+                src={getImageProxyUrl(imageUrl)}
                 alt={kit.title}
                 className="h-full max-h-[38rem] w-full object-contain"
               />

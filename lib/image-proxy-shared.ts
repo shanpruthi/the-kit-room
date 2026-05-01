@@ -84,3 +84,8 @@ export function resolveCatalogImageSrc(url: string | null | undefined): string {
 
   return `/api/image?src=${encodeURIComponent(trimmed)}`
 }
+
+/** Alias for {@link resolveCatalogImageSrc} — shared name for kit/modal image URLs. */
+export function getImageProxyUrl(url: string | null | undefined): string {
+  return resolveCatalogImageSrc(url)
+}
