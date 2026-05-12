@@ -3,7 +3,7 @@
  * Aligned with app usage: first catalog page uses INITIAL_FIND_CATALOG_LIMIT; infinite scroll
  * uses up to 150 on desktop and 50 on narrow viewports.
  */
-export const INITIAL_FIND_CATALOG_LIMIT = 40
+export const INITIAL_FIND_CATALOG_LIMIT = 48
 export const MAX_CATALOG_PAGE_LIMIT = 150
 export const MAX_CATALOG_OFFSET = 500_000
 /** Max values per facet (decade, brand, kitType, color) from query string. */

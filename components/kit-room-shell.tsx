@@ -15,6 +15,7 @@ import { createPortal } from "react-dom"
 import type { User } from "@supabase/supabase-js"
 import { useHeaderSlot } from "@/components/header-slot"
 import { KIT_ROOM_OPEN_AUTH_EVENT } from "@/components/site-nav"
+import { getImageProxyUrl, resolveAllowedImageSrc } from "@/lib/image-proxy-shared"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 import type { CatalogKit, CatalogPage, CatalogSummary, UserKitState } from "@/lib/types"
 
@@ -27,8 +28,8 @@ type KitRoomShellProps = {
   profileUserId?: string
 }
 
-const FIND_PAGE_SIZE_DESKTOP = 150
-const FIND_PAGE_SIZE_MOBILE = 20
+const FIND_PAGE_SIZE_DESKTOP = 48
+const FIND_PAGE_SIZE_MOBILE = 24
 
 const colorOptions = [
   { name: "Red", hex: "#c53b32" },
@@ -97,14 +98,6 @@ type SavedKitEntry = UserKitState & {
 }
 
 type ProfileTab = "rated" | "owned" | "wanted"
-
-function getImageProxyUrl(url: string | null) {
-  if (!url) {
-    return ""
-  }
-
-  return `/api/image?src=${encodeURIComponent(url)}`
-}
 
 function getUserAvatarUrl(user: User | null) {
   const metadata = user?.user_metadata as Record<string, unknown> | undefined
@@ -534,7 +527,9 @@ function ShirtTile({
   onImageLoad?: () => void
 }) {
   const resolvedImageSrc =
-    imageSrc === undefined ? getImageProxyUrl(kit.imageUrl) : imageSrc
+    imageSrc === undefined
+      ? resolveAllowedImageSrc(kit.thumbnailUrl ?? kit.imageUrl)
+      : imageSrc
 
   const imageHiddenUntilLoaded = animateImage && !imageLoaded
 
@@ -611,7 +606,7 @@ function KitModal({
     return null
   }
 
-  const imageUrl = kit.imageUrl
+  const imageUrl = kit.imageUrl ?? kit.thumbnailUrl
   const dominantColor = kit.colors[0]?.hex ?? "#dbd1c3"
 
   return (
@@ -1011,7 +1006,11 @@ function CatalogKitCard({
         <ShirtTile
           kit={kit}
           onImageError={onImageError}
-          imageSrc={shouldLoadImage ? getImageProxyUrl(kit.imageUrl) : null}
+          imageSrc={
+            shouldLoadImage
+              ? resolveAllowedImageSrc(kit.thumbnailUrl ?? kit.imageUrl)
+              : null
+          }
           imageLoading="lazy"
           animateImage
           imageLoaded={imageLoaded}
@@ -1147,6 +1146,7 @@ export function KitRoomShell({
   const [findLoading, setFindLoading] = useState(false)
   const [findLoadingMore, setFindLoadingMore] = useState(false)
   const [findError, setFindError] = useState<string | null>(null)
+  const [findLoadMoreError, setFindLoadMoreError] = useState<string | null>(null)
   const [selectedKit, setSelectedKit] = useState<CatalogKit | null>(null)
   const [showAbout] = useState(initialRoute === "about")
   const [showProfile] = useState(initialRoute === "profile")
@@ -1719,8 +1719,10 @@ export function KitRoomShell({
 
     if (append) {
       setFindLoadingMore(true)
+      setFindLoadMoreError(null)
     } else {
       setFindLoading(true)
+      setFindLoadMoreError(null)
     }
 
     setFindError(null)
@@ -1756,7 +1758,18 @@ export function KitRoomShell({
       })
 
       if (!response.ok) {
-        throw new Error("Failed to load catalog results.")
+        let message = "Failed to load catalog results."
+
+        try {
+          const payload = (await response.json()) as { error?: string }
+          if (typeof payload.error === "string" && payload.error.trim()) {
+            message = payload.error.trim()
+          }
+        } catch {
+          // Keep generic fallback when response is not JSON.
+        }
+
+        throw new Error(message)
       }
 
       const payload = (await response.json()) as CatalogPage
@@ -1786,6 +1799,13 @@ export function KitRoomShell({
         setFindKits([])
         setFindTotalCount(0)
         setFindHasMore(false)
+      } else {
+        setFindHasMore(false)
+        setFindLoadMoreError(
+          error instanceof Error
+            ? error.message
+            : "Could not load more kits.",
+        )
       }
     } finally {
       if (requestId === findRequestIdRef.current) {
@@ -1872,7 +1892,7 @@ export function KitRoomShell({
   }, [exploreKits, findKits, profileKits])
   const visibleFindKits = useMemo(() => {
     return findKits.filter(
-      (kit) => Boolean(kit.imageUrl) && !brokenImageIds.includes(kit.id),
+      (kit) => Boolean(kit.thumbnailUrl ?? kit.imageUrl) && !brokenImageIds.includes(kit.id),
     )
   }, [brokenImageIds, findKits])
 
@@ -2527,6 +2547,12 @@ export function KitRoomShell({
                   Loading more kits...
                 </p>
               ) : null}
+
+              {findLoadMoreError ? (
+                <p className="mx-auto mt-4 max-w-3xl text-center text-[13px] text-[#9a9a9a]">
+                  {findLoadMoreError}
+                </p>
+              ) : null}
             </>
           )}
         </section>
@@ -2546,9 +2572,9 @@ export function KitRoomShell({
               }}
             >
               {exploreKits.map((kit) => {
+                const cardImageUrl = kit.thumbnailUrl ?? kit.imageUrl ?? ""
                 const showKit =
-                  typeof kit.imageUrl === "string" &&
-                  kit.imageUrl.trim().length > 0 &&
+                  cardImageUrl.trim().length > 0 &&
                   !brokenImageIds.includes(kit.id)
 
                 return (

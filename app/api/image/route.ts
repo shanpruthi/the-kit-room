@@ -28,7 +28,7 @@ export async function GET(request: Request) {
   }
 
   const upstream = await fetch(parsed.toString(), {
-    next: { revalidate: 86_400 },
+    next: { revalidate: 31_536_000 },
     headers: {
       "User-Agent": "The Kit Room Image Proxy",
     },
@@ -40,7 +40,7 @@ export async function GET(request: Request) {
 
   const contentType =
     upstream.headers.get("content-type") ?? "application/octet-stream"
-  const cacheControl = "public, max-age=86400, stale-while-revalidate=604800"
+  const cacheControl = "public, max-age=31536000, immutable"
 
   if (upstream.body) {
     return new NextResponse(upstream.body, {

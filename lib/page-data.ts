@@ -6,6 +6,22 @@ import {
 } from "@/lib/kits"
 import type { CatalogPage, CatalogSummary } from "@/lib/types"
 
+const EMPTY_FIND_PAGE: CatalogPage = {
+  kits: [],
+  totalCount: 0,
+  limit: 48,
+  offset: 0,
+  hasMore: false,
+}
+
+const EMPTY_SUMMARY: CatalogSummary = {
+  kitsCount: 0,
+  teamsCount: 0,
+  decades: [],
+  brands: [],
+  kitTypes: [],
+}
+
 function buildFallbackSummary(initialFindPage: CatalogPage): CatalogSummary {
   return {
     kitsCount: initialFindPage.totalCount,
@@ -32,7 +48,18 @@ function buildFallbackSummary(initialFindPage: CatalogPage): CatalogSummary {
 }
 
 async function fetchKitRoomShellData() {
-  const initialFindPage = await getInitialFindCatalogPage()
+  let initialFindPage = EMPTY_FIND_PAGE
+
+  try {
+    initialFindPage = await getInitialFindCatalogPage()
+  } catch {
+    return {
+      initialFindPage: EMPTY_FIND_PAGE,
+      summary: EMPTY_SUMMARY,
+      exploreKits: [],
+      summaryNeedsRefresh: true,
+    }
+  }
   const [summaryResult, exploreResult] = await Promise.allSettled([
     getCatalogSummary(),
     getExploreKitCatalog(),

@@ -234,6 +234,32 @@ function pickCatalogImageUrl(
   return null
 }
 
+function pickCatalogThumbnailUrl(
+  kit: RawKitRow,
+  orderedImages: RawKitRow["kit_images"],
+): string | null {
+  const candidates: (string | null | undefined)[] = [
+    kit.primary_image_url,
+    kit.source_url,
+  ]
+
+  for (const row of orderedImages ?? []) {
+    candidates.push(row.source_url, row.object_url)
+  }
+
+  candidates.push(kit.primary_object_url)
+
+  for (const candidate of candidates) {
+    const normalized = normalizeCatalogImageUrl(candidate)
+
+    if (normalized) {
+      return normalized
+    }
+  }
+
+  return null
+}
+
 function mapCatalogKit(kit: RawKitRow): CatalogKit {
   const orderedColors = [...(kit.kit_colors ?? [])].sort(
     (left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0),
@@ -271,6 +297,7 @@ function mapCatalogKit(kit: RawKitRow): CatalogKit {
     description: kit.description,
     ratingAverage: Number(kit.community_rating_avg ?? 0),
     ratingCount: kit.community_rating_count ?? 0,
+    thumbnailUrl: pickCatalogThumbnailUrl(kit, orderedImages),
     imageUrl: pickCatalogImageUrl(kit, orderedImages),
     sourceUrl: kit.source_url,
     colors: orderedColors.map((color) => ({
@@ -287,7 +314,10 @@ function mapCatalogKit(kit: RawKitRow): CatalogKit {
 }
 
 function hasCatalogImage(kit: CatalogKit) {
-  return typeof kit.imageUrl === "string" && kit.imageUrl.trim().length > 0
+  return Boolean(
+    (typeof kit.thumbnailUrl === "string" && kit.thumbnailUrl.trim().length > 0) ||
+      (typeof kit.imageUrl === "string" && kit.imageUrl.trim().length > 0),
+  )
 }
 
 export async function getKitsByIds(ids: number[]): Promise<CatalogKit[]> {
@@ -413,7 +443,7 @@ export async function getInitialFindCatalogPage(): Promise<CatalogPage> {
     brands: [],
     kitTypes: [],
     colors: [],
-    limit: 20,
+    limit: 48,
     offset: 0,
     sortByMemberRating: true,
   })

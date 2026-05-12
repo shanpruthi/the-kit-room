@@ -26,6 +26,7 @@ export interface CatalogKit {
   description: string | null
   ratingAverage: number
   ratingCount: number
+  thumbnailUrl: string | null
   imageUrl: string | null
   sourceUrl: string | null
   colors: CatalogColor[]

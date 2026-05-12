@@ -13,7 +13,33 @@ function formatRating(value: number) {
 }
 
 export default async function TrendsPage() {
-  const data = await getTrendsPageData()
+  let data
+
+  try {
+    data = await getTrendsPageData()
+  } catch {
+    return (
+      <main className="min-h-screen bg-white pb-20">
+        <TrendsHeaderLeft />
+        <section className="mx-auto max-w-3xl px-4 pb-12 pt-20 sm:px-6 lg:px-8">
+          <div className="slide-up space-y-4">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-[#9a9a9a]">
+              Trends
+            </p>
+            <h1 className="text-5xl font-light tracking-[-0.05em] text-[#111] sm:text-6xl">
+              Trends unavailable right now
+            </h1>
+            <p className="text-[15px] leading-8 text-[#555]">
+              The trends page could not load because the connected Supabase
+              project is currently restricted. Once the storage and cached egress
+              quota issue is resolved, this page will come back automatically.
+            </p>
+          </div>
+        </section>
+      </main>
+    )
+  }
+
   const maxDecadeRating = Math.max(
     ...data.averageRatingByDecade.map((entry) => entry.averageRating),
     1,

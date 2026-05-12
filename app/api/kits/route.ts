@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server"
 import {
+  INITIAL_FIND_CATALOG_LIMIT,
   MAX_CATALOG_OFFSET,
   MAX_CATALOG_PAGE_LIMIT,
   MAX_FILTER_VALUES_PER_KEY,
   MAX_KITS_BY_IDS_PER_REQUEST,
 } from "@/lib/api-catalog-limits"
 import { getKitsByIds, searchKitCatalog } from "@/lib/kits"
+
+const RESTRICTED_PROJECT_MESSAGE =
+  "Failed to search kit catalog: Service for this project is restricted."
 
 function clampInt(value: number, min: number, max: number, fallback: number) {
   if (!Number.isFinite(value)) {
@@ -23,7 +27,10 @@ function takeFacets(values: string[]) {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
-  const limitValue = Number.parseInt(searchParams.get("limit") ?? "150", 10)
+  const limitValue = Number.parseInt(
+    searchParams.get("limit") ?? String(INITIAL_FIND_CATALOG_LIMIT),
+    10,
+  )
   const offsetValue = Number.parseInt(searchParams.get("offset") ?? "0", 10)
 
   const limit = clampInt(limitValue, 1, MAX_CATALOG_PAGE_LIMIT, MAX_CATALOG_PAGE_LIMIT)
@@ -44,8 +51,11 @@ export async function GET(request: Request) {
 
     return NextResponse.json(page)
   } catch (error) {
-    const message =
+    const rawMessage =
       error instanceof Error ? error.message : "Failed to load catalog page."
+    const message = rawMessage.toLowerCase().includes("service for this project is restricted")
+      ? RESTRICTED_PROJECT_MESSAGE
+      : rawMessage
 
     return NextResponse.json({ error: message }, { status: 500 })
   }
